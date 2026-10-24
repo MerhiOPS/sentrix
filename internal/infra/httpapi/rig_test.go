@@ -75,6 +75,7 @@ func newRig(t *testing.T) *rig {
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, r.redactor),
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, r.auth, time.Now),
 		Ready:       func(context.Context) error { return r.notReady },
+		Plans:       identity.NewPlans(st, time.Now),
 		System:      func(context.Context) (ServerStats, error) { return ServerStats{DBBytes: 4096, TTLOverdueS: 0}, nil },
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})

@@ -44,6 +44,8 @@ func Run(t *testing.T, newStores Factory) {
 		"hosts/disable-and-list-tenants":    testHostDisableAndList,
 		"retention/prunes-old-rows-of-kind": testRetentionPrunesOnlyOldRowsOfItsKind,
 		"alerts/sweep-undelivered":          testSweepUndelivered,
+		"plans/max-hosts-new-only":          testMaxHostsRefusesOnlyNewEnrollments,
+		"plans/metering-write-path":         testMeteringFromWritePath,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

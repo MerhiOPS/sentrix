@@ -73,6 +73,7 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, redactor),
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
 		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub),
+		Plans:        identity.NewPlans(st, time.Now),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,

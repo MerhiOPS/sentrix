@@ -18,7 +18,7 @@ func (s *Store) RetentionTargets(_ context.Context, ops domain.OpsScope) ([]rete
 	defer s.mu.Unlock()
 	var out []retention.Target
 	for _, h := range s.hosts {
-		out = append(out, retention.Target{Tenant: h.h.Tenant, Host: h.h.ID})
+		out = append(out, retention.Target{Tenant: h.h.Tenant, Host: h.h.ID, Plan: s.planOf(h.h.Tenant)})
 	}
 	return out, nil
 }

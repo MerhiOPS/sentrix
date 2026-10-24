@@ -61,6 +61,9 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	if err := recordLogUsage(ctx, tx, tk, hk, day, p); err != nil {
 		return ingest.CommitResult{}, err
 	}
+	if err := meterBatch(ctx, tx, tk, hk, day, res.Stored, p.LogStats.Bytes); err != nil {
+		return ingest.CommitResult{}, err
+	}
 	if err := recordSeq(ctx, tx, tk, hk, seqVal, p); err != nil {
 		return ingest.CommitResult{}, err
 	}

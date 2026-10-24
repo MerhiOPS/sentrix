@@ -17,6 +17,9 @@ import (
 type Target struct {
 	Tenant domain.TenantID
 	Host   domain.HostID
+	// Plan is the tenant's plan; its retention days cap the defaults. A
+	// zero plan means the defaults apply.
+	Plan domain.Plan
 }
 
 // Store is what the janitor needs. It is cross-tenant by nature, so every
@@ -72,8 +75,12 @@ func (j *Janitor) RunOnce(ctx context.Context) (deleted int, err error) {
 	var errs []error
 	var overdue time.Duration
 	for _, t := range targets {
+		ret := j.ret
+		if t.Plan.MetricsRetentionDays > 0 {
+			ret = t.Plan.Retention(j.ret)
+		}
 		for _, k := range domain.DataKinds {
-			keep, ok := j.ret[k]
+			keep, ok := ret[k]
 			if !ok {
 				continue
 			}

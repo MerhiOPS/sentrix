@@ -2,6 +2,7 @@
 //
 //	sentrix-server serve        --data DIR [--listen :8443] [--insecure] [--tls-cert F --tls-key F]
 //	sentrix-server tenant create --data DIR --name NAME
+//	sentrix-server tenant plan   --data DIR --tenant ID [--max-hosts N] [--log-mb-per-day N] [--metrics-days N] [--logs-days N]
 //	sentrix-server token create  --data DIR --tenant ID [--tls-cert F]
 //	sentrix-server user create   --data DIR --tenant ID --email E [--role admin|viewer]
 package main
@@ -28,11 +29,11 @@ func run(args []string) error {
 	case "serve":
 		return serve(rest)
 	case "tenant":
-		return subcommand(rest, "create", tenantCreate)
+		return subcommand(rest, map[string]func([]string) error{"create": tenantCreate, "plan": tenantPlan})
 	case "token":
-		return subcommand(rest, "create", tokenCreate)
+		return subcommand(rest, map[string]func([]string) error{"create": tokenCreate})
 	case "user":
-		return subcommand(rest, "create", userCreate)
+		return subcommand(rest, map[string]func([]string) error{"create": userCreate})
 	case "version":
 		fmt.Println(buildinfo.Describe(version))
 		return nil
@@ -41,15 +42,15 @@ func run(args []string) error {
 	}
 }
 
-func subcommand(args []string, name string, fn func([]string) error) error {
-	if len(args) == 0 || args[0] != name {
+func subcommand(args []string, cmds map[string]func([]string) error) error {
+	if len(args) == 0 || cmds[args[0]] == nil {
 		return usage()
 	}
-	return fn(args[1:])
+	return cmds[args[0]](args[1:])
 }
 
 func usage() error {
-	return fmt.Errorf("usage: sentrix-server serve|tenant create|token create|user create|version (see --help on each)")
+	return fmt.Errorf("usage: sentrix-server serve|tenant create|tenant plan|token create|user create|version (see --help on each)")
 }
 
 // version is set at build time with -ldflags "-X main.version=...".

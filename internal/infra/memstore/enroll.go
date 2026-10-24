@@ -43,6 +43,9 @@ func (s *Store) RedeemToken(_ context.Context, secretHash []byte, now time.Time,
 			return domain.Host{}, fmt.Errorf("credential: %w", domain.ErrConflict)
 		}
 	}
+	if s.enabledHosts(t.tenant) >= s.planOf(t.tenant).MaxHosts {
+		return domain.Host{}, fmt.Errorf("%w: the plan's host limit is reached", domain.ErrQuotaExceeded)
+	}
 	t.used = true
 	h := nh.Host
 	h.Tenant = t.tenant

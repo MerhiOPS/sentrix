@@ -56,6 +56,7 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 	}
 	s.applyDetails(h, p.Details, &res)
 	s.applyLogs(h, day, p, &res)
+	s.meterBatch(h, day, res.Stored, p.LogStats.Bytes)
 	s.applySnapshots(h, p.Processes, &res)
 	if n := len(p.Samples); n > 0 {
 		last := p.Samples[n-1]
