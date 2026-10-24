@@ -5,6 +5,88 @@ why. Newest first.
 
 ---
 
+## Phase 5 — Alerts · 2026-10-24
+
+**Landed**
+- Rules: metric + aggregation (avg/max/min; rates have one value per
+  bucket) + comparator + threshold + duration (whole minutes, 1m–24h) +
+  hosts (empty = every host) + cooldown + channels, and `no_data` rules
+  from `hosts.last_seen`. Every rule states its own `on_no_data`
+  (fire / resolve / hold).
+- Evaluation off the ingest path: every 10 s the evaluator checks for a
+  newly closed minute and, 30 s after it closes, evaluates that 1m rollup
+  bucket — one `TenantBuckets` query per tenant for all hosts (OLD C-M9),
+  using the same bucket value the chart shows (`query.BucketValue`). A
+  pure state machine per (rule, host): ok → pending → firing → resolved, on
+  an injectable clock. Disabled rules and disabled hosts are never
+  evaluated (OLD C-M2); a rule matching no enabled host is shown **inert**
+  (OLD C-M12).
+- Event row written before the state row, in one transaction (R1).
+  Cooldown suppresses repeat **firing** notifications only, never a resolve.
+  Silences hold back notifications, never transitions.
+- Delivery off the evaluation path: a bounded queue (full → event marked
+  failed at once), 3 attempts per channel with backoff, per-channel failures
+  recorded on the event, any failure marks it failed (OLD C-M6).
+- Notifiers: webhook (documented JSON body) and Slack (control sequences
+  escaped). **SSRF guard** in the dialer's `Control` hook, on the address
+  actually connected to (no separate resolve, so DNS rebinding cannot pass):
+  loopback, RFC 1918, ULA, link-local incl. 169.254.169.254, CGNAT,
+  0.0.0.0/8, multicast, IPv4-mapped IPv6, NAT64/6to4/Teredo (which embed
+  IPv4), reserved ranges. `Proxy: nil`, no redirects, 10 s timeout, body
+  caps; transport errors are stripped of the URL (a Slack URL is a
+  credential and errors are shown on the event).
+- Channel URLs masked for **every** role (OLD B2); a masked URL sent back on
+  update keeps the stored secret; a masked URL is refused on create.
+- Host disable / enable (API + UI): the agent's cached credential is dropped
+  at once, not left to the 30 s TTL.
+- Storage: migration 0005; every reference (rule → host, rule → channel,
+  state, event, silence) is a composite `(tenant_key, key)` foreign key, so
+  a cross-tenant link cannot be stored even by a buggy adapter. memstore
+  implements everything; 6 contract cases and 17 cross-tenant cases.
+- Dashboard: Alerts page (active alerts, rules with inert / no-channel
+  badges, recent transitions with delivery outcome, channels, silences,
+  admin rule form with on_no_data visible); host page Disable/Enable.
+
+**Acceptance**
+- fire/resolve cycle on a fake clock — `TestFireAndResolveCycle`, `TestEvaluatorFiresNotifiesAndResolves` ✅
+- a single spike does not fire a 5 m rule — `TestSingleSpikeDoesNotFireFiveMinuteRule` ✅
+- `on_no_data` resolve vs hold (and fire) — `TestOnNoDataResolveVsHold` ✅
+- webhook to 127.0.0.1 and to a name resolving to it refused — `TestRefusesLoopbackByAddressAndByName`;
+  manual run: both refused at dial time, the event shows `failed` with the reason ✅
+- admin and viewer both see masked secrets — `TestChannelSecretsMaskedForEveryRole`, manual run (screenshots) ✅
+- disabled host never fires — `TestDisabledHostNeverFires`; manual run: agent refused on its next batch (403), rules shown inert ✅
+- tenant A cannot create a rule on tenant B's host — `TestRuleOnAnotherTenantsHostRefused`, `RuleRepo.CreateRule` /
+  `UpdateRule` cross-tenant cases ✅
+
+**Observed in the manual run** (real agent, 5 s interval): a `max cpu > 0
+for 1m` rule created at 16:23:07 fired at 16:24:35 for the 16:23 bucket —
+the documented ~1.5 min floor. All API responses validated against
+`docs/openapi.yaml` in tests.
+
+**Mutation testing** — 38 mutations of the guards (deny list entries,
+`Proxy`, redirects, URL stripping, cooldown/silence rules, duration
+boundary, disabled host/rule filters, retries, queue-full marking, masking,
+every tenant predicate in the new SQL, memstore ownership checks, cache
+invalidation, role checks), each compile-checked first: all killed. Two
+survived on the first pass and the tests were strengthened: the repeated-
+tick guard (re-evaluation is idempotent, so the test now counts reads), and
+the `ListRules` cross-tenant case (it checked host links, which the
+mutated query still filtered — it now checks rule ids).
+
+**Caught before shipping**
+- The demo host's real hostname contains the workstation's user name. The
+  Phase 5 screenshots use a renamed host; the **Phase 2–4 screenshots
+  already committed show it** and are to be retaken (Phase 8).
+
+**Deferred**
+- A notification still queued at shutdown keeps an empty outcome (shown as
+  "pending" forever); a startup sweep marking them is Phase 6.
+- Batches arriving more than 30 s after their minute closes are stored but
+  not seen by that minute's evaluation.
+- Rule editing in the UI is create/delete only (the API has PUT).
+
+---
+
 ## Phase 4 — Logs · 2026-10-24
 
 **Landed**

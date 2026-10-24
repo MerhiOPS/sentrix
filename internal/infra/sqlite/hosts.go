@@ -88,3 +88,18 @@ func scanHost(scan func(...any) error, tenant domain.TenantID) (domain.Host, err
 	}
 	return h, nil
 }
+
+// SetHostDisabled implements identity.HostRepo.
+func (s *Store) SetHostDisabled(ctx context.Context, sc domain.Scope, id domain.HostID, at *time.Time) error {
+	w := s.db.Writer()
+	tk, err := tenantKey(ctx, w, sc)
+	if err != nil {
+		return err
+	}
+	res, err := w.ExecContext(ctx, `UPDATE hosts SET disabled_at = ? WHERE tenant_key = ? AND id = ?`,
+		encOptTime(at), tk, encID(domain.ID(id)))
+	if err != nil {
+		return fmt.Errorf("set host disabled: %w", err)
+	}
+	return mustAffect(res, "host")
+}

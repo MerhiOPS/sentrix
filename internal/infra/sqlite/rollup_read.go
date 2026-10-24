@@ -66,14 +66,16 @@ func (s *Store) Rollups(ctx context.Context, sc domain.Scope, host domain.HostID
 	return out, rows.Err()
 }
 
-func scanRollup(scan func(...any) error) (query.RollupBucket, error) {
+// scanRollup scans one rollup row; lead are destinations for columns
+// selected before the rollup's own.
+func scanRollup(scan func(...any) error, lead ...any) (query.RollupBucket, error) {
 	n := 2 + 3*len(rollupGauges) + 2*len(rollupCounters) + 2
 	vals := make([]int64, n)
 	ptrs := make([]any, n)
 	for i := range vals {
 		ptrs[i] = &vals[i]
 	}
-	if err := scan(ptrs...); err != nil {
+	if err := scan(append(lead, ptrs...)...); err != nil {
 		return query.RollupBucket{}, fmt.Errorf("scan rollup: %w", err)
 	}
 	b := query.RollupBucket{Start: decTime(vals[0]), N: int(vals[1]), Gauges: map[query.Gauge]query.Agg{}, Counters: map[string]query.Edge{}}

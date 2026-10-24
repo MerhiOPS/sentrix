@@ -15,6 +15,7 @@ import (
 	"github.com/getkin/kin-openapi/routers"
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
+	"github.com/MerhiOPS/sentrix/internal/app/alerting"
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
@@ -43,6 +44,7 @@ type rig struct {
 	ingest   *ingest.Service
 	srv      *httptest.Server
 	redactor *redact.Redactor
+	auth     *ingest.Authenticator
 	router   routers.Router
 	a, b     tenantRig
 }
@@ -65,10 +67,12 @@ func newRig(t *testing.T) *rig {
 	r.ingest.SetLogPipeline(r.redactor, nil)
 	r.a = seedTenant(t, st, hasher, "a")
 	r.b = seedTenant(t, st, hasher, "b")
+	r.auth = ingest.NewAuthenticator(st, time.Minute, 100, time.Now)
 	api := New(Config{
 		Sessions: sessions, Users: st, Tokens: identity.NewEnrollment(st, time.Now),
 		Hosts: st, Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: r.hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, r.redactor),
+		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, r.auth, time.Now),
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})
 	r.srv = httptest.NewServer(api)

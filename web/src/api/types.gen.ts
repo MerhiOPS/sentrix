@@ -219,6 +219,164 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hosts/{id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only. The agent is refused at once and the host is no longer evaluated by alert rules. */
+        post: operations["disableHost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hosts/{id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only. */
+        post: operations["enableHost"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Every (rule, host) not ok, and the newest events. */
+        get: operations["listAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alert-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listAlertRules"];
+        put?: never;
+        /**
+         * @description Admin only. Evaluated each minute against the last complete 1-minute
+         *     rollup, so an alert fires at the earliest about 1.5 minutes after
+         *     its condition starts holding for `duration_s`.
+         */
+        post: operations["createAlertRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/alert-rules/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Admin only. Replaces the rule; its state and history are kept. */
+        put: operations["updateAlertRule"];
+        post?: never;
+        /** @description Admin only. Removes the rule with its state and events. */
+        delete: operations["deleteAlertRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description URLs are masked for every role; a channel URL is a credential. */
+        get: operations["listChannels"];
+        put?: never;
+        /** @description Admin only. https URLs only. */
+        post: operations["createChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/channels/{cid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** @description Admin only. Sending the masked URL back keeps the stored one. */
+        put: operations["updateChannel"];
+        post?: never;
+        delete: operations["deleteChannel"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/silences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSilences"];
+        put?: never;
+        /** @description Admin only. Suppresses notifications, never transitions. At most 30 days. */
+        post: operations["createSilence"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/silences/{sid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteSilence"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -415,6 +573,144 @@ export interface components {
             /** Format: uuid */
             host_id: string;
             samples: components["schemas"]["Sample"][];
+        };
+        /** @enum {string} */
+        AlertState: "ok" | "pending" | "firing";
+        AlertRuleInput: {
+            name: string;
+            /** @enum {string} */
+            kind: "threshold" | "no_data";
+            /** @description cpu, mem, disk, load1, load5, load15, mem_used, net_rx_rate, net_tx_rate, disk_r_rate, disk_w_rate */
+            metric?: string;
+            /**
+             * @description Ignored for rates (one rate per bucket).
+             * @enum {string}
+             */
+            aggregation?: "avg" | "max" | "min";
+            /** @enum {string} */
+            comparator?: "gt" | "lt";
+            threshold?: number;
+            /** @description Whole minutes. */
+            duration_s: number;
+            /** @description Empty means every host. */
+            hosts?: string[];
+            /** @enum {string} */
+            on_no_data?: "fire" | "resolve" | "hold";
+            cooldown_s?: number;
+            channels?: number[];
+            enabled: boolean;
+        };
+        AlertRule: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @enum {string} */
+            kind: "threshold" | "no_data";
+            metric: string;
+            aggregation: string;
+            comparator: string;
+            threshold: number;
+            duration_s: number;
+            hosts: string[];
+            on_no_data: string;
+            cooldown_s: number;
+            channels: number[];
+            enabled: boolean;
+            /** @description The rule matches no enabled host and cannot fire. */
+            inert: boolean;
+        };
+        AlertRuleList: {
+            rules: components["schemas"]["AlertRule"][];
+        };
+        ChannelInput: {
+            name: string;
+            /** @enum {string} */
+            kind: "webhook" | "slack";
+            url: string;
+        };
+        Channel: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            /** @enum {string} */
+            kind: "webhook" | "slack";
+            /** @description Masked: scheme and host only. */
+            url: string;
+        };
+        ChannelList: {
+            channels: components["schemas"]["Channel"][];
+        };
+        SilenceInput: {
+            /** Format: int64 */
+            rule_id?: number | null;
+            /** Format: uuid */
+            host_id?: string | null;
+            /** Format: date-time */
+            starts: string;
+            /** Format: date-time */
+            ends: string;
+            reason?: string;
+        };
+        Silence: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            rule_id: number | null;
+            /** Format: uuid */
+            host_id: string | null;
+            /** Format: date-time */
+            starts: string;
+            /** Format: date-time */
+            ends: string;
+            reason: string;
+        };
+        SilenceList: {
+            silences: components["schemas"]["Silence"][];
+        };
+        Alerts: {
+            states: {
+                /** Format: int64 */
+                rule_id: number;
+                /** Format: uuid */
+                host_id: string;
+                state: components["schemas"]["AlertState"];
+                /** Format: date-time */
+                since: string;
+            }[];
+            events: components["schemas"]["AlertEvent"][];
+        };
+        AlertEvent: {
+            /** Format: int64 */
+            id: number;
+            /** Format: int64 */
+            rule_id: number;
+            /** Format: uuid */
+            host_id: string;
+            from: components["schemas"]["AlertState"];
+            to: components["schemas"]["AlertState"];
+            /** Format: date-time */
+            at: string;
+            value: number | null;
+            /** @description A notification was due (not silenced, not in cooldown). */
+            notified: boolean;
+            /**
+             * @description Empty while delivery is pending.
+             * @enum {string}
+             */
+            outcome: "" | "delivered" | "failed";
+            /** @description Per-channel failures, if any. */
+            delivery: string;
+        };
+        /** @description The body POSTed to a webhook channel. */
+        AlertWebhook: {
+            rule: string;
+            host: string;
+            state: components["schemas"]["AlertState"];
+            metric?: string;
+            value?: number;
+            /** Format: date-time */
+            at: string;
+            resolved: boolean;
         };
     };
     responses: {
@@ -797,6 +1093,353 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+        };
+    };
+    disableHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HostID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Disabled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    enableHost: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HostID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Enabled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listAlerts: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Current alerts and recent transitions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Alerts"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    listAlertRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's rules. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRuleList"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    updateAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AlertRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlertRule"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteAlertRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listChannels: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's channels. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelList"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Created (URL masked). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Channel"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    updateChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChannelInput"];
+            };
+        };
+        responses: {
+            /** @description Updated (URL masked). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Channel"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                cid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listSilences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's silences. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SilenceList"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createSilence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SilenceInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Silence"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    deleteSilence: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
         };
     };
 }

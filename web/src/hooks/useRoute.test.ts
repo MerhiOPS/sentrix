@@ -9,6 +9,9 @@ describe("routes", () => {
   it("chart clicks carry host and time to the logs route", () => {
     expect(parseRoute(logsHref("abc", 1_790_000_000_123.4))).toEqual({ page: "logs", hostId: "abc", atMs: 1_790_000_000_123 });
   });
+  it("parses the alerts page", () => {
+    expect(parseRoute("#/alerts")).toEqual({ page: "alerts" });
+  });
   it("anything else is the fleet", () => {
     expect(parseRoute("")).toEqual({ page: "fleet" });
     expect(parseRoute("#/nope")).toEqual({ page: "fleet" });
