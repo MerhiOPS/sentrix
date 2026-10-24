@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"flag"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -19,7 +20,7 @@ import (
 
 type serveFlags struct {
 	data, listen, apiListen, origins string
-	insecure, apiTLS                 bool
+	insecure, apiTLS, demo           bool
 	tls                              tlsFlags
 }
 
@@ -32,14 +33,20 @@ func parseServe(args []string) (serveFlags, error) {
 	fs.StringVar(&f.apiListen, "api-listen", "127.0.0.1:8080", "dashboard address")
 	fs.BoolVar(&f.apiTLS, "api-tls", false, "serve the dashboard over TLS (required off loopback)")
 	fs.StringVar(&f.origins, "api-origins", "", "extra allowed origins, comma-separated (dev server)")
+	fs.BoolVar(&f.demo, "demo", false, "seed a demo tenant and run simulated hosts through the real ingest path")
 	f.tls.register(fs)
 	if err := fs.Parse(args); err != nil {
 		return f, err
 	}
+	if f.demo && f.insecure {
+		return f, errors.New("--demo runs its simulated agents over pinned TLS; drop --insecure")
+	}
 	if err := ingesthttp.CheckListen(f.listen, f.insecure); err != nil {
 		return f, err
 	}
-	if err := ingesthttp.CheckListen(f.apiListen, !f.apiTLS); err != nil {
+	// A demo's dashboard may be plain HTTP anywhere (a container publishes
+	// it): its data is synthetic. Nothing else relaxes this check.
+	if err := ingesthttp.CheckListen(f.apiListen, !f.apiTLS && !f.demo); err != nil {
 		return f, errors.New("dashboard: " + err.Error() + " — pass --api-tls or keep it on loopback behind a TLS proxy")
 	}
 	return f, nil
@@ -72,6 +79,18 @@ func serve(args []string) error {
 	h, err := build(ctx, st, f.data, pin, splitList(f.origins))
 	if err != nil {
 		return errors.Join(err, closeDB())
+	}
+	if f.demo {
+		s, err := setupDemo(ctx, st, f.data)
+		if err != nil {
+			return errors.Join(fmt.Errorf("demo: %w", err), closeDB())
+		}
+		go func() { // enrolls through the listener started below
+			if err := runDemo(ctx, st, f.data, f.listen, pin, s); err != nil {
+				slog.Error("demo", "err", err)
+			}
+		}()
+		slog.Warn("DEMO MODE: synthetic data, dashboard may be plain HTTP; do not use for real hosts")
 	}
 	ingestSrv := ingesthttp.NewServer(f.listen, h.ingest, pick(!f.insecure, tlsCfg))
 	apiSrv := ingesthttp.NewServer(f.apiListen, h.dashboard, pick(f.apiTLS, tlsCfg))

@@ -18,6 +18,12 @@ import (
 // The token's pin is applied to the TLS connection *before* the token secret
 // is sent, so a man in the middle never sees it (PLAN §2).
 func Enroll(ctx context.Context, dir, serverURL, token string, interval time.Duration) (Identity, error) {
+	return EnrollAs(ctx, dir, serverURL, token, interval, collector.ReadHostInfo(ctx))
+}
+
+// EnrollAs is Enroll with the host description given rather than read from
+// this machine (the demo's simulated hosts).
+func EnrollAs(ctx context.Context, dir, serverURL, token string, interval time.Duration, hi collector.HostInfo) (Identity, error) {
 	if _, err := LoadIdentity(dir); err == nil {
 		return Identity{}, errors.New("already enrolled: remove the state directory to enroll again")
 	}
@@ -30,7 +36,6 @@ func Enroll(ctx context.Context, dir, serverURL, token string, interval time.Dur
 	if err != nil {
 		return Identity{}, err
 	}
-	hi := collector.ReadHostInfo(ctx)
 	body, err := json.Marshal(wire.EnrollRequest{Token: token, Host: wire.HostInfo{
 		Hostname: hi.Hostname, OS: hi.OS, Platform: hi.Platform,
 		AgentVersion: Version, IntervalMS: interval.Milliseconds(),
