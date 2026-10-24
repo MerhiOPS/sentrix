@@ -23,6 +23,10 @@ func Run(t *testing.T, newStores Factory) {
 		"ingest/last-seen-updated":          testLastSeenUpdated,
 		"ingest/gauge-precision":            testGaugePrecision,
 		"ingest/health-persisted":           testHealthPersisted,
+		"ingest/latest-never-backwards":     testLatestNeverGoesBackwards,
+		"users/email-unique-across-tenants": testUserEmailUniqueAcrossTenants,
+		"users/find-login":                  testFindLoginReturnsTenantAndHash,
+		"sessions/lifecycle":                testSessionLifecycle,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

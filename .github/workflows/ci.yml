@@ -81,6 +81,14 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
       - run: npm ci
+      # The API types are generated from docs/openapi.yaml: drift means a
+      # hand-edit or an un-regenerated spec change.
+      - name: generated API types are current
+        run: |
+          npm run gen:api
+          git diff --exit-code src/api/types.gen.ts
+      - name: no Go files inside node_modules (they would join go build ./...)
+        run: test -z "$(find node_modules -name '*.go' -print -quit)"
       - run: npm run typecheck
       - run: npm test
       - run: npm run build

@@ -1,0 +1,248 @@
+openapi: 3.0.3
+info:
+  title: Sentrix dashboard API
+  version: "1"
+  description: |
+    The browser API. Source of truth: web types are generated from this file
+    (CI fails on drift) and Go handler responses are validated against it in
+    tests.
+
+    Authentication is a session cookie (`sentrix_session`, HttpOnly, Secure,
+    SameSite=Strict). State-changing requests and the WebSocket upgrade must
+    carry an `Origin` header matching the server.
+
+    Live data: `GET /api/v1/stream` upgrades to a WebSocket. The client sends
+    `{"type":"subscribe","hosts":["<id>",...]|null,"since_ms":<unix ms>}`;
+    the server sends `CoreFrame` messages. Another tenant's host ids are
+    silently ignored. A closed socket means "reconnect with since_ms".
+servers:
+  - url: /api/v1
+security:
+  - session: []
+paths:
+  /auth/login:
+    post:
+      operationId: login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LoginRequest" }
+      responses:
+        "200":
+          description: Logged in; sets the session cookie.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /auth/logout:
+    post:
+      operationId: logout
+      responses:
+        "204": { description: Logged out; clears the cookie. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+  /me:
+    get:
+      operationId: me
+      responses:
+        "200":
+          description: The current user.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Me" }
+        "401": { $ref: "#/components/responses/Error" }
+  /hosts:
+    get:
+      operationId: listHosts
+      responses:
+        "200":
+          description: Every host of the tenant, with its latest sample.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HostList" }
+        "401": { $ref: "#/components/responses/Error" }
+  /hosts/{id}:
+    get:
+      operationId: getHost
+      parameters:
+        - $ref: "#/components/parameters/HostID"
+      responses:
+        "200":
+          description: One host.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Host" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /hosts/{id}/metrics:
+    get:
+      operationId: hostMetrics
+      parameters:
+        - $ref: "#/components/parameters/HostID"
+        - name: gauges
+          in: query
+          required: true
+          description: Comma-separated gauge names.
+          schema: { type: string, example: "cpu,mem" }
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: step
+          in: query
+          required: false
+          description: Bucket width in seconds; default is the host's interval. Requests over 2000 points are refused.
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: Columnar series; null marks a bucket without data.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Frame" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /enrollment-tokens:
+    post:
+      operationId: createEnrollmentToken
+      description: Admin only. The token is shown once.
+      responses:
+        "201":
+          description: A single-use token.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EnrollmentToken" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+components:
+  securitySchemes:
+    session:
+      type: apiKey
+      in: cookie
+      name: sentrix_session
+  parameters:
+    HostID:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+  responses:
+    Error:
+      description: An error.
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string }
+        password: { type: string }
+    Role:
+      type: string
+      enum: [admin, viewer]
+    Me:
+      type: object
+      required: [user_id, email, role, tenant_id]
+      properties:
+        user_id: { type: string, format: uuid }
+        email: { type: string }
+        role: { $ref: "#/components/schemas/Role" }
+        tenant_id: { type: string, format: uuid }
+    HostStatus:
+      type: string
+      enum: [ok, stale, no_data, disabled]
+    Sample:
+      type: object
+      required: [ts_ms, cpu, mem, disk, load1, load5, load15, mem_used, uptime, net_rx, net_tx, disk_r, disk_w]
+      properties:
+        ts_ms: { type: integer, format: int64 }
+        cpu: { type: number }
+        mem: { type: number }
+        disk: { type: number }
+        load1: { type: number }
+        load5: { type: number }
+        load15: { type: number }
+        mem_used: { type: integer, format: int64 }
+        uptime: { type: integer, format: int64 }
+        net_rx: { type: integer, format: int64 }
+        net_tx: { type: integer, format: int64 }
+        disk_r: { type: integer, format: int64 }
+        disk_w: { type: integer, format: int64 }
+    Health:
+      type: object
+      required: [buffer_depth, dropped_total, clock_skew_ms, rejected_total, conflict_total]
+      properties:
+        buffer_depth: { type: integer }
+        dropped_total: { type: integer, format: int64 }
+        clock_skew_ms: { type: integer, format: int64 }
+        rejected_total: { type: integer, format: int64 }
+        conflict_total: { type: integer, format: int64 }
+    Host:
+      type: object
+      required: [id, name, os, platform, agent_version, interval_ms, status, created_at, health]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        os: { type: string }
+        platform: { type: string }
+        agent_version: { type: string }
+        interval_ms: { type: integer, format: int64 }
+        status: { $ref: "#/components/schemas/HostStatus" }
+        created_at: { type: string, format: date-time }
+        last_seen: { type: string, format: date-time, nullable: true }
+        health: { $ref: "#/components/schemas/Health" }
+        latest: { allOf: [{ $ref: "#/components/schemas/Sample" }], nullable: true }
+    HostList:
+      type: object
+      required: [hosts, server_time]
+      properties:
+        hosts:
+          type: array
+          items: { $ref: "#/components/schemas/Host" }
+        server_time: { type: string, format: date-time }
+    Frame:
+      type: object
+      required: [from, to, step_s, ts_ms, series]
+      properties:
+        from: { type: string, format: date-time }
+        to: { type: string, format: date-time }
+        step_s: { type: integer }
+        ts_ms:
+          type: array
+          items: { type: integer, format: int64 }
+        series:
+          type: object
+          additionalProperties:
+            type: array
+            items: { type: number, nullable: true }
+    EnrollmentToken:
+      type: object
+      required: [token, expires_at]
+      properties:
+        token: { type: string }
+        expires_at: { type: string, format: date-time }
+    CoreFrame:
+      description: WebSocket message from the server.
+      type: object
+      required: [type, host_id, samples]
+      properties:
+        type: { type: string, enum: [core] }
+        host_id: { type: string, format: uuid }
+        samples:
+          type: array
+          items: { $ref: "#/components/schemas/Sample" }

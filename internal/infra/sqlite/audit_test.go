@@ -9,13 +9,15 @@ import (
 )
 
 // tenantTables are tables whose rows belong to one tenant.
-var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core)\b`)
+var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core|users|sessions)\b`)
 
 // unscopedAllowed are the only statements that may touch tenant tables
 // without a tenant predicate, each because it is how the tenant is *found*.
 var unscopedAllowed = map[string]string{
-	"WHERE h.credential_hash = ?":               "agent credential → tenant (AuthenticateCredential)",
-	"WHERE secret_hash = ? AND used_at IS NULL": "enrollment token → tenant (RedeemToken)",
+	"WHERE h.credential_hash = ?":                      "agent credential → tenant (AuthenticateCredential)",
+	"WHERE secret_hash = ? AND used_at IS NULL":        "enrollment token → tenant (RedeemToken)",
+	"WHERE u.email = ?":                                "login email → tenant (FindLogin)",
+	"WHERE s.token_hash = ? AND u.disabled_at IS NULL": "session cookie → tenant (GetSession)",
 }
 
 // auditProblems returns every statement that touches a tenant table without

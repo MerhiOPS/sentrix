@@ -15,6 +15,12 @@ type HostReader interface {
 	ListHosts(ctx context.Context, s domain.Scope) ([]domain.Host, error)
 }
 
+// LatestReader reads the newest sample of every host in a scope: what the
+// fleet grid shows. It never scans history (PLAN §4: latest_core).
+type LatestReader interface {
+	LatestCore(ctx context.Context, s domain.Scope) (map[domain.HostID]domain.CoreSample, error)
+}
+
 // CoreReader reads raw core samples. Counters come back reset-adjusted.
 // The range is [from, to), ordered by time.
 type CoreReader interface {

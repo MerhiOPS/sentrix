@@ -34,12 +34,16 @@ type Service struct {
 	store  Store
 	window Window
 	now    func() time.Time
+	pub    Publisher // optional
 }
 
 // NewService builds the ingest use case.
 func NewService(store Store, window Window, now func() time.Time) *Service {
 	return &Service{store: store, window: window, now: now}
 }
+
+// SetPublisher attaches the live feed. Call before serving.
+func (s *Service) SetPublisher(p Publisher) { s.pub = p }
 
 // Ingest stores one batch for an authenticated host. The scope is built from
 // the credential's tenant; nothing in b can change which tenant or host the
@@ -65,8 +69,10 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	now := s.now().UTC()
 	samples, rejected := normalize(b.Samples, interval, s.window, now)
 
+	var stored []domain.CoreSample
 	build := func(state CounterState) (Prepared, error) {
 		folded, next := foldCounters(state, samples)
+		stored = folded
 		return Prepared{
 			Samples: folded, Counters: next, Rejected: rejected,
 			Interval: interval, Agent: b.Agent, ReceivedAt: now,
@@ -76,6 +82,9 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	cr, err := s.store.CommitBatch(ctx, scope, ah.Host, b.Seq, build)
 	if err != nil {
 		return Result{}, fmt.Errorf("commit batch: %w", err)
+	}
+	if s.pub != nil && !cr.Replayed && len(stored) > 0 {
+		s.pub.PublishCore(ah.Tenant, ah.Host, stored) // after commit, never before
 	}
 	res := Result{Replayed: cr.Replayed, Stored: cr.Stored, Conflicts: cr.Conflicts, ServerNow: now}
 	if !cr.Replayed {
