@@ -51,3 +51,18 @@ h3 { font-size: 14px; color: var(--muted); font-weight: 500; }
 .procs td:nth-child(n+2), .procs th:nth-child(n+2) { text-align: right; }
 .small { font-size: 12px; }
 .u-legend { font-size: 12px; color: var(--muted); }
+.log-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.log-filters .search { flex: 1 1 320px; }
+.log-filters select { padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+input[aria-invalid="true"] { border-color: var(--nodata); }
+.live-toggle { display: flex; flex-direction: row; gap: 4px; align-items: center; }
+.logs { width: 100%; border-collapse: collapse; font-size: 13px; }
+.logs th, .logs td { text-align: left; padding: 4px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.logs pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: ui-monospace, monospace; }
+.nowrap { white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.level { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--line); }
+.level-error, .level-fatal { background: #3b1d1d; color: var(--nodata); }
+.level-warn { background: #3b301d; color: var(--stale); }
+.rules { margin-bottom: 12px; }
+.rules summary { cursor: pointer; }
+.rules form { display: flex; gap: 8px; }

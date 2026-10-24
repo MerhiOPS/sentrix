@@ -15,6 +15,7 @@ type Batch struct {
 	Samples   []domain.CoreSample
 	Details   []domain.DetailSample
 	Processes []domain.ProcessSnapshot
+	Logs      []domain.LogLine
 	Agent     AgentStats
 }
 
@@ -24,16 +25,19 @@ const (
 	MaxSamples   = 1000
 	MaxDetails   = 20000
 	MaxSnapshots = 200
+	MaxLogs      = 5000
 )
 
 // Result is what the agent is told.
 type Result struct {
-	Replayed      bool
-	Stored        int
-	Rejected      int
-	Conflicts     int
-	SeriesRefused int
-	ServerNow     time.Time
+	Replayed       bool
+	Stored         int
+	Rejected       int
+	Conflicts      int
+	SeriesRefused  int
+	LogsShed       int
+	LogsShedReason string
+	ServerNow      time.Time
 }
 
 // Service ingests batches.
@@ -42,6 +46,8 @@ type Service struct {
 	window Window
 	now    func() time.Time
 	pub    Publisher // optional
+	redact Redactor  // required once logs are accepted
+	disk   DiskGuard // optional
 }
 
 // NewService builds the ingest use case.
@@ -51,6 +57,11 @@ func NewService(store Store, window Window, now func() time.Time) *Service {
 
 // SetPublisher attaches the live feed. Call before serving.
 func (s *Service) SetPublisher(p Publisher) { s.pub = p }
+
+// SetLogPipeline attaches redaction (required for logs) and the disk
+// watermark (optional). Without a redactor, log lines are refused: storing
+// unredacted logs is never the fallback.
+func (s *Service) SetLogPipeline(r Redactor, d DiskGuard) { s.redact, s.disk = r, d }
 
 // Ingest stores one batch for an authenticated host. The scope is built from
 // the credential's tenant; nothing in b can change which tenant or host the
@@ -62,7 +73,7 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	if b.Seq == 0 || b.Seq > domain.MaxCounter {
 		return Result{}, fmt.Errorf("%w: batch_seq must be in [1, 2^63)", domain.ErrInvalid)
 	}
-	if len(b.Samples) > MaxSamples || len(b.Details) > MaxDetails || len(b.Processes) > MaxSnapshots {
+	if len(b.Samples) > MaxSamples || len(b.Details) > MaxDetails || len(b.Processes) > MaxSnapshots || len(b.Logs) > MaxLogs {
 		return Result{}, fmt.Errorf("%w: batch over size limits", domain.ErrInvalid)
 	}
 	scope, err := domain.NewScope(ah.Tenant)
@@ -77,15 +88,28 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	samples, rejected := normalize(b.Samples, interval, s.window, now)
 	details, rejDetails := normalizeDetails(b.Details, interval, s.window, now)
 	snaps, rejSnaps := normalizeSnapshots(b.Processes, s.window, now)
-	rejected += rejDetails + rejSnaps
+	logs, stats, rejLogs, err := s.prepareLogs(ctx, scope, b.Logs, now)
+	if err != nil {
+		return Result{}, err
+	}
+	rejected += rejDetails + rejSnaps + rejLogs
 
 	var stored []domain.CoreSample
-	build := func(state CounterState) (Prepared, error) {
-		folded, next := foldCounters(state, samples)
+	var storedLogs []domain.LogLine
+	var final LogStats
+	build := func(st TxState) (Prepared, error) {
+		folded, next := foldCounters(st.Counters, samples)
 		foldedDetails, next := foldDetailCounters(next, details)
-		stored = folded
+		fit, shed, bytes := fitBudget(logs, max(st.LogBudget, 0))
+		final = stats
+		final.Bytes = bytes
+		if shed > 0 {
+			final.Shed, final.ShedReason = final.Shed+shed, ShedQuota
+		}
+		stored, storedLogs = folded, fit
 		return Prepared{
-			Samples: folded, Details: foldedDetails, Processes: snaps, Counters: next, Rejected: rejected,
+			Samples: folded, Details: foldedDetails, Processes: snaps, Logs: fit, LogStats: final,
+			Counters: next, Rejected: rejected,
 			Interval: interval, Agent: b.Agent, ReceivedAt: now,
 			SeqRetention: s.window.SeqRetention(),
 		}, nil
@@ -94,11 +118,19 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	if err != nil {
 		return Result{}, fmt.Errorf("commit batch: %w", err)
 	}
-	if s.pub != nil && !cr.Replayed && len(stored) > 0 {
-		s.pub.PublishCore(ah.Tenant, ah.Host, stored) // after commit, never before
+	if s.pub != nil && !cr.Replayed {
+		if len(stored) > 0 {
+			s.pub.PublishCore(ah.Tenant, ah.Host, stored) // after commit, never before
+		}
+		if len(storedLogs) > 0 {
+			s.pub.PublishLogs(ah.Tenant, ah.Host, storedLogs)
+		}
 	}
 	res := Result{Replayed: cr.Replayed, Stored: cr.Stored, Conflicts: cr.Conflicts,
 		SeriesRefused: cr.SeriesRefused, ServerNow: now}
+	if !cr.Replayed {
+		res.LogsShed, res.LogsShedReason = final.Shed, final.ShedReason
+	}
 	if !cr.Replayed {
 		res.Rejected = rejected
 	}

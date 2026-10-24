@@ -39,13 +39,25 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	if err != nil {
 		return ingest.CommitResult{}, err
 	}
-	p, err := build(state)
+	day := utcDay(s.now()) // one accounting day for the budget read and the usage write
+	budget, err := logBudget(ctx, tx, tk, day)
+	if err != nil {
+		return ingest.CommitResult{}, err
+	}
+	p, err := build(ingest.TxState{Counters: state, LogBudget: budget})
 	if err != nil {
 		return ingest.CommitResult{}, fmt.Errorf("build batch: %w", err)
 	}
 	sr := &seriesResolver{tx: tx, tk: tk, hk: hk, cache: &s.series, pending: map[seriesID]int64{}}
 	res, err := writePrepared(ctx, tx, tk, hk, p, sr)
 	if err != nil {
+		return ingest.CommitResult{}, err
+	}
+	if err := writeLogs(ctx, tx, tk, hk, p.Logs); err != nil {
+		return ingest.CommitResult{}, err
+	}
+	res.LogsStored = len(p.Logs)
+	if err := recordLogUsage(ctx, tx, tk, hk, day, p); err != nil {
 		return ingest.CommitResult{}, err
 	}
 	if err := recordSeq(ctx, tx, tk, hk, seqVal, p); err != nil {

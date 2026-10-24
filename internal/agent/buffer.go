@@ -1,6 +1,10 @@
 package agent
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/MerhiOPS/sentrix/internal/infra/logtail"
+)
 
 // Pending is an encoded batch waiting to be acknowledged. The body is built
 // once (gzip JSON) so a resend is byte-identical — the server's replay gate
@@ -9,6 +13,10 @@ type Pending struct {
 	Seq     uint64
 	Body    []byte
 	Samples int
+	// Marks are the log read positions this batch completes, by source.
+	// They are committed only when the batch settles (acked, or refused as
+	// permanently invalid) — never on send (R1, at-least-once).
+	Marks map[string]logtail.Mark
 }
 
 // Buffer is a bounded FIFO of pending batches (in memory in Phase 1; the

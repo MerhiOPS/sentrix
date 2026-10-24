@@ -22,10 +22,14 @@ const (
 	maxSubscribeHost = 1000
 )
 
+// subscribeMsg is the client's first message: "subscribe" for metrics,
+// "tail" for logs (with levels and q as in GET /logs).
 type subscribeMsg struct {
 	Type    string    `json:"type"`
 	Hosts   *[]string `json:"hosts"` // null: every host of the tenant
 	SinceMS int64     `json:"since_ms"`
+	Levels  []string  `json:"levels"`
+	Q       string    `json:"q"`
 }
 
 // handleStream upgrades to a WebSocket fed by the live hub. The tenant comes
@@ -44,42 +48,58 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	c.SetReadLimit(maxSubscribeMsg)
 	sess := sessionFrom(r.Context())
 
-	sub, err := a.readSubscribe(r.Context(), c, sess.Tenant)
+	m, err := readFirst(r.Context(), c)
 	if err != nil {
-		_ = c.Close(websocket.StatusPolicyViolation, "expected a subscribe message")
+		_ = c.Close(websocket.StatusPolicyViolation, "expected a subscribe or tail message")
 		return
 	}
-	defer a.cfg.Live.Unsubscribe(sub)
 	ctx := c.CloseRead(r.Context()) // ends when the client goes away
-	if err := pump(ctx, c, sub); err != nil && !errors.Is(err, context.Canceled) {
+	switch m.Type {
+	case "subscribe":
+		sub := a.cfg.Live.Subscribe(sess.Tenant, hostIDs(m.Hosts), time.UnixMilli(m.SinceMS))
+		defer a.cfg.Live.Unsubscribe(sub)
+		err = pump(ctx, c, sub)
+	case "tail":
+		err = a.tail(ctx, c, sess.Tenant, m)
+	default:
+		_ = c.Close(websocket.StatusPolicyViolation, "unknown message type")
+		return
+	}
+	if err != nil && !errors.Is(err, context.Canceled) {
 		slog.Debug("stream ended", "err", err)
 	}
 }
 
-func (a *API) readSubscribe(ctx context.Context, c *websocket.Conn, tenant domain.TenantID) (*livehub.Sub, error) {
+func readFirst(ctx context.Context, c *websocket.Conn) (subscribeMsg, error) {
 	rctx, cancel := context.WithTimeout(ctx, subscribeTimeout)
 	defer cancel()
 	_, data, err := c.Read(rctx)
 	if err != nil {
-		return nil, err
+		return subscribeMsg{}, err
 	}
 	var m subscribeMsg
-	if err := json.Unmarshal(data, &m); err != nil || m.Type != "subscribe" {
-		return nil, errors.New("bad subscribe message")
+	if err := json.Unmarshal(data, &m); err != nil {
+		return subscribeMsg{}, errors.New("bad first message")
 	}
-	var hosts []domain.HostID
-	if m.Hosts != nil {
-		hosts = []domain.HostID{} // explicit list: possibly empty, never "all"
-		for i, s := range *m.Hosts {
-			if i >= maxSubscribeHost {
-				break
-			}
-			if id, err := domain.ParseHostID(s); err == nil {
-				hosts = append(hosts, id)
-			}
+	return m, nil
+}
+
+// hostIDs parses the host list; nil means all hosts. Unparseable ids are
+// skipped, and another tenant's ids simply never match in the hub.
+func hostIDs(in *[]string) []domain.HostID {
+	if in == nil {
+		return nil
+	}
+	hosts := []domain.HostID{} // explicit list: possibly empty, never "all"
+	for i, s := range *in {
+		if i >= maxSubscribeHost {
+			break
+		}
+		if id, err := domain.ParseHostID(s); err == nil {
+			hosts = append(hosts, id)
 		}
 	}
-	return a.cfg.Live.Subscribe(tenant, hosts, time.UnixMilli(m.SinceMS)), nil
+	return hosts
 }
 
 // pump writes hub events until the subscription closes (slow client) or the

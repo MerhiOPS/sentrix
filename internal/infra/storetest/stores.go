@@ -12,6 +12,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
+	"github.com/MerhiOPS/sentrix/internal/app/redaction"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
@@ -30,6 +31,8 @@ type Stores interface {
 	query.RollupReader
 	query.DetailReader
 	query.ProcessReader
+	query.LogReader
+	redaction.RuleRepo
 }
 
 // Factory builds a fresh, empty adapter for one test.
@@ -106,9 +109,9 @@ func newFixture(t *testing.T, st Stores, name string) fixture {
 // prepared builds a BuildFunc that stores samples at the given offsets (in
 // intervals of 5 s from T0) with a counter value each.
 func prepared(at time.Time, offsets []int, rx []uint64) ingest.BuildFunc {
-	return func(state ingest.CounterState) (ingest.Prepared, error) {
+	return func(state ingest.TxState) (ingest.Prepared, error) {
 		p := ingest.Prepared{
-			Counters: state, Interval: 5 * time.Second, ReceivedAt: at,
+			Counters: state.Counters, Interval: 5 * time.Second, ReceivedAt: at,
 			SeqRetention: ingest.DefaultWindow.SeqRetention(),
 		}
 		for i, off := range offsets {

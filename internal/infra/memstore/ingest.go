@@ -28,7 +28,8 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 	if _, seen := h.seqs[seq]; seen {
 		return ingest.CommitResult{Replayed: true}, nil
 	}
-	p, err := build(cloneState(h.counters))
+	day := utcDay(s.now())
+	p, err := build(ingest.TxState{Counters: cloneState(h.counters), LogBudget: s.logBudget(h.h.Tenant, day)})
 	if err != nil {
 		return ingest.CommitResult{}, fmt.Errorf("build batch: %w", err)
 	}
@@ -53,6 +54,7 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 		res.Stored++
 	}
 	s.applyDetails(h, p.Details, &res)
+	s.applyLogs(h, day, p, &res)
 	s.applySnapshots(h, p.Processes, &res)
 	if n := len(p.Samples); n > 0 {
 		last := p.Samples[n-1]

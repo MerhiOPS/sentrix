@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/domain"
+	"github.com/MerhiOPS/sentrix/internal/infra/logtail"
 	"github.com/MerhiOPS/sentrix/internal/wire"
 )
 
@@ -25,6 +26,8 @@ type Batcher struct {
 	samples  []wire.Sample
 	details  []wire.Detail
 	snaps    []wire.Snapshot
+	logs     []wire.LogLine
+	marks    map[string]logtail.Mark
 	seq      *SeqSource
 	interval time.Duration
 	stats    Stats
@@ -63,42 +66,61 @@ func (b *Batcher) AddSnapshot(s domain.ProcessSnapshot) {
 	b.snaps = append(b.snaps, ws)
 }
 
-// Seal turns the accumulated samples into a Pending batch. It returns false
-// when there is nothing to send. The seq is allocated (and persisted) before
-// the batch exists, so a crash after Seal can never reuse it.
-func (b *Batcher) Seal() (Pending, bool, error) {
+// Seal turns everything accumulated into Pending batches: usually one, more
+// when logs exceed a batch's limits. Seqs are allocated (and persisted)
+// before the batches exist, so a crash after Seal can never reuse one.
+func (b *Batcher) Seal() ([]Pending, error) {
 	b.mu.Lock()
-	samples, details, snaps := b.samples, b.details, b.snaps
-	b.samples, b.details, b.snaps = nil, nil, nil
+	c := contents{samples: b.samples, details: b.details, snaps: b.snaps, logs: b.logs, marks: b.marks}
+	b.samples, b.details, b.snaps, b.logs, b.marks = nil, nil, nil, nil, nil
 	b.mu.Unlock()
-	if len(samples) == 0 && len(details) == 0 && len(snaps) == 0 {
-		return Pending{}, false, nil
+	if c.empty() {
+		return nil, nil
 	}
+	chunks := c.split()
+	out := make([]Pending, 0, len(chunks))
+	for _, ch := range chunks {
+		p, err := b.encode(ch)
+		if err != nil {
+			b.restore(c)
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
+func (b *Batcher) encode(c contents) (Pending, error) {
 	seq, err := b.seq.Next()
 	if err != nil {
-		b.restore(samples, details, snaps)
-		return Pending{}, false, err
+		return Pending{}, err
 	}
 	body, err := encodeBatch(wire.Batch{
-		BatchSeq: seq, IntervalMS: b.interval.Milliseconds(), Samples: samples, Details: details, Processes: snaps,
+		BatchSeq: seq, IntervalMS: b.interval.Milliseconds(), Samples: c.samples, Details: c.details,
+		Processes: c.snaps, Logs: c.logs,
 		Agent: wire.AgentStats{
 			Version: Version, BufferDepth: b.stats.BufferDepth(),
 			DroppedTotal: b.stats.DroppedTotal(), ClockSkewMS: b.stats.ClockSkew().Milliseconds(),
 		},
 	})
 	if err != nil {
-		return Pending{}, false, err
+		return Pending{}, err
 	}
-	return Pending{Seq: seq, Body: body, Samples: len(samples)}, true, nil
+	return Pending{Seq: seq, Body: body, Samples: len(c.samples), Marks: c.marks}, nil
 }
 
 // restore puts everything back after a failed seal, ahead of newer data.
-func (b *Batcher) restore(samples []wire.Sample, details []wire.Detail, snaps []wire.Snapshot) {
+// Marks already superseded by newer ones are kept as the newer ones.
+func (b *Batcher) restore(c contents) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	b.samples = append(samples, b.samples...)
-	b.details = append(details, b.details...)
-	b.snaps = append(snaps, b.snaps...)
+	b.samples = append(c.samples, b.samples...)
+	b.details = append(c.details, b.details...)
+	b.snaps = append(c.snaps, b.snaps...)
+	b.logs = append(c.logs, b.logs...)
+	if b.marks == nil {
+		b.marks = c.marks
+	}
 }
 
 func encodeBatch(b wire.Batch) ([]byte, error) {

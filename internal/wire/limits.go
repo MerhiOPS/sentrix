@@ -22,6 +22,10 @@ const (
 	// MaxSnapshotsPerBatch caps process snapshots per batch.
 	MaxSnapshotsPerBatch = 200
 
+	// MaxLogsPerBatch caps log lines per batch. Message size is capped by
+	// the domain (16 KiB); MaxDecompressedBytes bounds the total.
+	MaxLogsPerBatch = 5000
+
 	// MaxEnrollBytes caps the enrollment request.
 	MaxEnrollBytes = 16 << 10
 )

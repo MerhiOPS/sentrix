@@ -9,10 +9,13 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
+	"github.com/MerhiOPS/sentrix/internal/app/redaction"
+	"github.com/MerhiOPS/sentrix/internal/infra/diskguard"
 	"github.com/MerhiOPS/sentrix/internal/infra/httpapi"
 	"github.com/MerhiOPS/sentrix/internal/infra/ingesthttp"
 	"github.com/MerhiOPS/sentrix/internal/infra/livehub"
 	"github.com/MerhiOPS/sentrix/internal/infra/password"
+	"github.com/MerhiOPS/sentrix/internal/infra/redact"
 	"github.com/MerhiOPS/sentrix/internal/infra/sqlite"
 	"github.com/MerhiOPS/sentrix/internal/wire"
 	"github.com/MerhiOPS/sentrix/web"
@@ -27,6 +30,9 @@ const (
 	loginWindow     = 15 * time.Minute
 	loginTrackKeys  = 50_000
 	shutdownTimeout = 15 * time.Second
+	ruleCacheTTL    = 30 * time.Second // a rule change applies at once (invalidated) or within this
+	minFreeForLogs  = 0.20             // below 20 % free, logs are shed and metrics keep flowing
+	diskCheckEvery  = 10 * time.Second
 )
 
 // handlers are the two HTTP surfaces of one server process.
@@ -36,10 +42,12 @@ type handlers struct {
 }
 
 // build wires every use case onto the store. pin is nil in CA mode.
-func build(ctx context.Context, st *sqlite.Store, pin []byte, extraOrigins []string) (handlers, error) {
+func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, extraOrigins []string) (handlers, error) {
 	hub := livehub.New()
 	svc := ingest.NewService(st, ingest.DefaultWindow, time.Now)
 	svc.SetPublisher(hub)
+	redactor := redact.New(st, ruleCacheTTL, time.Now)
+	svc.SetLogPipeline(redactor, diskguard.New(dataDir, minFreeForLogs, diskCheckEvery))
 	enroll := identity.NewEnrollment(st, time.Now)
 	ingestH := ingesthttp.NewHandler(ingest.NewAuthenticator(st, authTTL, authCache, time.Now), svc, enroll)
 
@@ -58,6 +66,7 @@ func build(ctx context.Context, st *sqlite.Store, pin []byte, extraOrigins []str
 	api := httpapi.New(httpapi.Config{
 		Sessions: sessions, Users: st, Tokens: enroll, Hosts: st,
 		Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: hub,
+		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, redactor),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,
