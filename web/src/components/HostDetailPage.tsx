@@ -3,13 +3,16 @@ import { useHost } from "../hooks/useHostData";
 import { HOST_TABS } from "../lib/hostTabs";
 import { statusLabel } from "../lib/status";
 import { CorePanel } from "./CorePanel";
+import { HostLifecycleButton } from "./HostLifecycleButton";
 import { ProcessTable } from "./ProcessTable";
 import { RangePicker } from "./RangePicker";
 import { SeriesPanel } from "./SeriesPanel";
 import { StatusBadge } from "./StatusBadge";
 import { Tabs } from "./Tabs";
 
-export function HostDetailPage({ hostId, tab, range }: { hostId: string; tab: string; range: string }) {
+interface Props { hostId: string; tab: string; range: string; isAdmin: boolean }
+
+export function HostDetailPage({ hostId, tab, range, isAdmin }: Props) {
   const host = useHost(hostId);
   const current = HOST_TABS.find((t) => t.key === tab) ?? HOST_TABS[0]!;
   const go = (t: string, r: string) => { location.hash = hostHref(hostId, t, r); };
@@ -23,6 +26,7 @@ export function HostDetailPage({ hostId, tab, range }: { hostId: string; tab: st
         <h1>{host.data?.name ?? "…"}</h1>
         {host.data && <StatusBadge status={host.data.status} />}
         {host.data && <span className="muted">{host.data.platform} · agent {host.data.agent_version} · {statusLabel[host.data.status]}</span>}
+        {host.data && isAdmin && <HostLifecycleButton hostId={hostId} disabled={host.data.status === "disabled"} />}
       </header>
       <div className="toolbar">
         <Tabs tabs={HOST_TABS} value={current.key} onChange={(t) => go(t, range)} />

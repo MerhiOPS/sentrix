@@ -65,18 +65,44 @@ type Rules interface {
 	Delete(ctx context.Context, s domain.Scope, id int64) error
 }
 
+// AlertAdmin manages alert rules, channels and silences and reads alert
+// state. Channel URLs it returns are already masked.
+type AlertAdmin interface {
+	Rules(ctx context.Context, s domain.Scope) ([]domain.AlertRule, error)
+	CreateRule(ctx context.Context, s domain.Scope, r domain.AlertRule) (domain.AlertRule, error)
+	UpdateRule(ctx context.Context, s domain.Scope, r domain.AlertRule) error
+	DeleteRule(ctx context.Context, s domain.Scope, id int64) error
+	Channels(ctx context.Context, s domain.Scope) ([]domain.Channel, error)
+	CreateChannel(ctx context.Context, s domain.Scope, c domain.Channel) (domain.Channel, error)
+	UpdateChannel(ctx context.Context, s domain.Scope, c domain.Channel) error
+	DeleteChannel(ctx context.Context, s domain.Scope, id int64) error
+	Silences(ctx context.Context, s domain.Scope) ([]domain.Silence, error)
+	CreateSilence(ctx context.Context, s domain.Scope, sil domain.Silence) (domain.Silence, error)
+	DeleteSilence(ctx context.Context, s domain.Scope, id int64) error
+	States(ctx context.Context, s domain.Scope) ([]domain.RuleHostState, error)
+	Events(ctx context.Context, s domain.Scope, limit int) ([]domain.AlertEvent, error)
+}
+
+// HostAdmin disables and re-enables hosts.
+type HostAdmin interface {
+	Disable(ctx context.Context, s domain.Scope, id domain.HostID) error
+	Enable(ctx context.Context, s domain.Scope, id domain.HostID) error
+}
+
 // Config is everything the API depends on.
 type Config struct {
-	Sessions SessionService
-	Users    Users
-	Tokens   TokenIssuer
-	Hosts    Hosts
-	Series   Series
-	Details  DetailSeries
-	Procs    query.ProcessReader
-	Logs     LogSearch
-	Rules    Rules
-	Live     Live
+	Sessions  SessionService
+	Users     Users
+	Tokens    TokenIssuer
+	Hosts     Hosts
+	Series    Series
+	Details   DetailSeries
+	Procs     query.ProcessReader
+	Logs      LogSearch
+	Rules     Rules
+	Alerts    AlertAdmin
+	HostAdmin HostAdmin
+	Live      Live
 	// FormatToken renders an issued secret for the operator (adds the
 	// server's SPKI pin in self-signed mode).
 	FormatToken  func(secret []byte) string
@@ -109,6 +135,7 @@ func New(cfg Config) *API {
 	a.mux.HandleFunc("GET /api/v1/redaction-rules", a.requireSession(admin, a.handleListRules))
 	a.mux.HandleFunc("POST /api/v1/redaction-rules", a.requireOrigin(a.requireSession(admin, a.handleCreateRule)))
 	a.mux.HandleFunc("DELETE /api/v1/redaction-rules/{rid}", a.requireOrigin(a.requireSession(admin, a.handleDeleteRule)))
+	a.alertRoutes(viewer, admin)
 	a.mux.HandleFunc("GET /api/v1/stream", a.requireSession(viewer, a.handleStream))
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, errorBody{Error: "not found"})
@@ -117,6 +144,24 @@ func New(cfg Config) *API {
 		a.mux.Handle("/", spa(cfg.Web))
 	}
 	return a
+}
+
+func (a *API) alertRoutes(viewer, admin domain.Role) {
+	write := func(h http.HandlerFunc) http.HandlerFunc { return a.requireOrigin(a.requireSession(admin, h)) }
+	a.mux.HandleFunc("POST /api/v1/hosts/{id}/disable", write(a.handleHostDisable))
+	a.mux.HandleFunc("POST /api/v1/hosts/{id}/enable", write(a.handleHostEnable))
+	a.mux.HandleFunc("GET /api/v1/alerts", a.requireSession(viewer, a.handleAlerts))
+	a.mux.HandleFunc("GET /api/v1/alert-rules", a.requireSession(viewer, a.handleListAlertRules))
+	a.mux.HandleFunc("POST /api/v1/alert-rules", write(a.handleCreateAlertRule))
+	a.mux.HandleFunc("PUT /api/v1/alert-rules/{rid}", write(a.handleUpdateAlertRule))
+	a.mux.HandleFunc("DELETE /api/v1/alert-rules/{rid}", write(a.handleDeleteAlertRule))
+	a.mux.HandleFunc("GET /api/v1/channels", a.requireSession(viewer, a.handleListChannels))
+	a.mux.HandleFunc("POST /api/v1/channels", write(a.handleCreateChannel))
+	a.mux.HandleFunc("PUT /api/v1/channels/{cid}", write(a.handleUpdateChannel))
+	a.mux.HandleFunc("DELETE /api/v1/channels/{cid}", write(a.handleDeleteChannel))
+	a.mux.HandleFunc("GET /api/v1/silences", a.requireSession(viewer, a.handleListSilences))
+	a.mux.HandleFunc("POST /api/v1/silences", write(a.handleCreateSilence))
+	a.mux.HandleFunc("DELETE /api/v1/silences/{sid}", write(a.handleDeleteSilence))
 }
 
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {

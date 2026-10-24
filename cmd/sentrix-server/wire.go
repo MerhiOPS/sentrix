@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/MerhiOPS/sentrix/internal/app/alerting"
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
@@ -49,7 +50,8 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 	redactor := redact.New(st, ruleCacheTTL, time.Now)
 	svc.SetLogPipeline(redactor, diskguard.New(dataDir, minFreeForLogs, diskCheckEvery))
 	enroll := identity.NewEnrollment(st, time.Now)
-	ingestH := ingesthttp.NewHandler(ingest.NewAuthenticator(st, authTTL, authCache, time.Now), svc, enroll)
+	auth := ingest.NewAuthenticator(st, authTTL, authCache, time.Now)
+	ingestH := ingesthttp.NewHandler(auth, svc, enroll)
 
 	limiter := identity.NewLoginLimiter(loginFailures, loginWindow, loginTrackKeys, time.Now)
 	sessions, err := identity.NewSessions(ctx, st, st, password.New(hashParallel), limiter, time.Now)
@@ -67,10 +69,12 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Sessions: sessions, Users: st, Tokens: enroll, Hosts: st,
 		Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, redactor),
+		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,
 		Now:          time.Now,
 	})
+	startAlerting(ctx, st)
 	return handlers{ingest: ingestH, dashboard: api}, nil
 }

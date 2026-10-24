@@ -66,3 +66,14 @@ input[aria-invalid="true"] { border-color: var(--nodata); }
 .rules { margin-bottom: 12px; }
 .rules summary { cursor: pointer; }
 .rules form { display: flex; gap: 8px; }
+.alerts-page { display: grid; gap: 16px; }
+.alerts-page ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.rule-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.rule-form select { padding: 8px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 6px; }
+.rule-form input[type="number"] { width: 90px; }
+label.inline { display: flex; flex-direction: row; gap: 6px; align-items: center; }
+.badge-firing { background: #3b1d1d; color: var(--nodata); }
+.badge-pending { background: #3b301d; color: var(--stale); }
+.ok { color: var(--ok); }
+.detail-head button { margin-left: auto; }
+button.danger { background: #8a2f2f; }

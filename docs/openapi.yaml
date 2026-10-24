@@ -256,6 +256,202 @@ paths:
               schema: { $ref: "#/components/schemas/EnrollmentToken" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /hosts/{id}/disable:
+    post:
+      operationId: disableHost
+      description: Admin only. The agent is refused at once and the host is no longer evaluated by alert rules.
+      parameters:
+        - $ref: "#/components/parameters/HostID"
+      responses:
+        "204": { description: Disabled. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /hosts/{id}/enable:
+    post:
+      operationId: enableHost
+      description: Admin only.
+      parameters:
+        - $ref: "#/components/parameters/HostID"
+      responses:
+        "204": { description: Enabled. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /alerts:
+    get:
+      operationId: listAlerts
+      description: Every (rule, host) not ok, and the newest events.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        "200":
+          description: Current alerts and recent transitions.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Alerts" }
+        "401": { $ref: "#/components/responses/Error" }
+  /alert-rules:
+    get:
+      operationId: listAlertRules
+      responses:
+        "200":
+          description: The tenant's rules.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertRuleList" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createAlertRule
+      description: |
+        Admin only. Evaluated each minute against the last complete 1-minute
+        rollup, so an alert fires at the earliest about 1.5 minutes after
+        its condition starts holding for `duration_s`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AlertRuleInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertRule" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /alert-rules/{rid}:
+    put:
+      operationId: updateAlertRule
+      description: Admin only. Replaces the rule; its state and history are kept.
+      parameters:
+        - { name: rid, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AlertRuleInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AlertRule" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteAlertRule
+      description: Admin only. Removes the rule with its state and events.
+      parameters:
+        - { name: rid, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /channels:
+    get:
+      operationId: listChannels
+      description: URLs are masked for every role; a channel URL is a credential.
+      responses:
+        "200":
+          description: The tenant's channels.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ChannelList" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createChannel
+      description: Admin only. https URLs only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelInput" }
+      responses:
+        "201":
+          description: Created (URL masked).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /channels/{cid}:
+    put:
+      operationId: updateChannel
+      description: Admin only. Sending the masked URL back keeps the stored one.
+      parameters:
+        - { name: cid, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ChannelInput" }
+      responses:
+        "200":
+          description: Updated (URL masked).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Channel" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteChannel
+      parameters:
+        - { name: cid, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /silences:
+    get:
+      operationId: listSilences
+      responses:
+        "200":
+          description: The tenant's silences.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SilenceList" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createSilence
+      description: Admin only. Suppresses notifications, never transitions. At most 30 days.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SilenceInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Silence" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /silences/{sid}:
+    delete:
+      operationId: deleteSilence
+      parameters:
+        - { name: sid, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:
@@ -493,3 +689,135 @@ components:
         samples:
           type: array
           items: { $ref: "#/components/schemas/Sample" }
+    AlertState:
+      type: string
+      enum: [ok, pending, firing]
+    AlertRuleInput:
+      type: object
+      additionalProperties: false
+      required: [name, kind, duration_s, enabled]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        kind: { type: string, enum: [threshold, no_data] }
+        metric: { type: string, description: "cpu, mem, disk, load1, load5, load15, mem_used, net_rx_rate, net_tx_rate, disk_r_rate, disk_w_rate" }
+        aggregation: { type: string, enum: [avg, max, min], description: Ignored for rates (one rate per bucket). }
+        comparator: { type: string, enum: [gt, lt] }
+        threshold: { type: number }
+        duration_s: { type: integer, minimum: 60, maximum: 86400, description: Whole minutes. }
+        hosts: { type: array, items: { type: string, format: uuid }, description: Empty means every host. }
+        on_no_data: { type: string, enum: [fire, resolve, hold] }
+        cooldown_s: { type: integer, minimum: 0, maximum: 86400 }
+        channels: { type: array, items: { type: integer, format: int64 } }
+        enabled: { type: boolean }
+    AlertRule:
+      type: object
+      required: [id, name, kind, metric, aggregation, comparator, threshold, duration_s, hosts, on_no_data, cooldown_s, channels, enabled, inert]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        kind: { type: string, enum: [threshold, no_data] }
+        metric: { type: string }
+        aggregation: { type: string }
+        comparator: { type: string }
+        threshold: { type: number }
+        duration_s: { type: integer }
+        hosts: { type: array, items: { type: string, format: uuid } }
+        on_no_data: { type: string }
+        cooldown_s: { type: integer }
+        channels: { type: array, items: { type: integer, format: int64 } }
+        enabled: { type: boolean }
+        inert: { type: boolean, description: The rule matches no enabled host and cannot fire. }
+    AlertRuleList:
+      type: object
+      required: [rules]
+      properties:
+        rules: { type: array, items: { $ref: "#/components/schemas/AlertRule" } }
+    ChannelInput:
+      type: object
+      additionalProperties: false
+      required: [name, kind, url]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        kind: { type: string, enum: [webhook, slack] }
+        url: { type: string }
+    Channel:
+      type: object
+      required: [id, name, kind, url]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        kind: { type: string, enum: [webhook, slack] }
+        url: { type: string, description: "Masked: scheme and host only." }
+    ChannelList:
+      type: object
+      required: [channels]
+      properties:
+        channels: { type: array, items: { $ref: "#/components/schemas/Channel" } }
+    SilenceInput:
+      type: object
+      additionalProperties: false
+      required: [starts, ends]
+      properties:
+        rule_id: { type: integer, format: int64, nullable: true }
+        host_id: { type: string, format: uuid, nullable: true }
+        starts: { type: string, format: date-time }
+        ends: { type: string, format: date-time }
+        reason: { type: string, maxLength: 200 }
+    Silence:
+      type: object
+      required: [id, rule_id, host_id, starts, ends, reason]
+      properties:
+        id: { type: integer, format: int64 }
+        rule_id: { type: integer, format: int64, nullable: true }
+        host_id: { type: string, format: uuid, nullable: true }
+        starts: { type: string, format: date-time }
+        ends: { type: string, format: date-time }
+        reason: { type: string }
+    SilenceList:
+      type: object
+      required: [silences]
+      properties:
+        silences: { type: array, items: { $ref: "#/components/schemas/Silence" } }
+    Alerts:
+      type: object
+      required: [states, events]
+      properties:
+        states:
+          type: array
+          items:
+            type: object
+            required: [rule_id, host_id, state, since]
+            properties:
+              rule_id: { type: integer, format: int64 }
+              host_id: { type: string, format: uuid }
+              state: { $ref: "#/components/schemas/AlertState" }
+              since: { type: string, format: date-time }
+        events:
+          type: array
+          items: { $ref: "#/components/schemas/AlertEvent" }
+    AlertEvent:
+      type: object
+      required: [id, rule_id, host_id, from, to, at, value, notified, outcome, delivery]
+      properties:
+        id: { type: integer, format: int64 }
+        rule_id: { type: integer, format: int64 }
+        host_id: { type: string, format: uuid }
+        from: { $ref: "#/components/schemas/AlertState" }
+        to: { $ref: "#/components/schemas/AlertState" }
+        at: { type: string, format: date-time }
+        value: { type: number, nullable: true }
+        notified: { type: boolean, description: "A notification was due (not silenced, not in cooldown)." }
+        outcome: { type: string, enum: ["", delivered, failed], description: Empty while delivery is pending. }
+        delivery: { type: string, description: "Per-channel failures, if any." }
+    AlertWebhook:
+      description: The body POSTed to a webhook channel.
+      type: object
+      required: [rule, host, state, at, resolved]
+      properties:
+        rule: { type: string }
+        host: { type: string }
+        state: { $ref: "#/components/schemas/AlertState" }
+        metric: { type: string }
+        value: { type: number }
+        at: { type: string, format: date-time }
+        resolved: { type: boolean }

@@ -36,6 +36,12 @@ func Run(t *testing.T, newStores Factory) {
 		"logs/pagination":                   testLogPaginationNewestFirstNoGapsNoDuplicates,
 		"logs/budget-in-transaction":        testLogBudgetReadInTransaction,
 		"logs/all-dropped-metered":          testAllDroppedBatchIsMetered,
+		"alerts/rule-round-trip":            testAlertRuleRoundTrip,
+		"alerts/rule-unknown-refs-refused":  testAlertRuleUnknownRefsRefused,
+		"alerts/transitions-and-events":     testAlertTransitionsAndEvents,
+		"alerts/silence-round-trip":         testAlertSilenceRoundTrip,
+		"alerts/tenant-buckets-match":       testTenantBucketsMatchRollups,
+		"hosts/disable-and-list-tenants":    testHostDisableAndList,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

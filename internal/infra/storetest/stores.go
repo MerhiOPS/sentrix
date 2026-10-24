@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/MerhiOPS/sentrix/internal/app/alerting"
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
@@ -33,6 +34,13 @@ type Stores interface {
 	query.ProcessReader
 	query.LogReader
 	redaction.RuleRepo
+	identity.HostRepo
+	alerting.RuleRepo
+	alerting.ChannelRepo
+	alerting.SilenceRepo
+	alerting.StateRepo
+	alerting.BucketReader
+	alerting.TenantLister
 }
 
 // Factory builds a fresh, empty adapter for one test.

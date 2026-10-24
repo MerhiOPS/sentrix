@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 export type Route =
   | { page: "fleet" }
   | { page: "host"; hostId: string; tab: string; range: string }
-  | { page: "logs"; hostId: string | null; atMs: number | null };
+  | { page: "logs"; hostId: string | null; atMs: number | null }
+  | { page: "alerts" };
 
 /** Parses "#/hosts/<id>?tab=cpu&range=6h" and friends. Pure, so testable. */
 export function parseRoute(hash: string): Route {
@@ -17,6 +18,7 @@ export function parseRoute(hash: string): Route {
     const at = Number(q.get("at"));
     return { page: "logs", hostId: q.get("host"), atMs: Number.isFinite(at) && at > 0 ? at : null };
   }
+  if (parts[0] === "alerts") return { page: "alerts" };
   return { page: "fleet" };
 }
 
