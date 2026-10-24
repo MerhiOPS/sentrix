@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 	"time"
@@ -62,7 +61,7 @@ func buildRollupUpsert(table string) string {
 }
 
 // rollupSample folds one inserted sample into every resolution.
-func rollupSample(ctx context.Context, tx *sql.Tx, tk, hk int64, s domain.CoreSample) error {
+func rollupSample(ctx context.Context, tx *batchTx, tk, hk int64, s domain.CoreSample) error {
 	gauges := []int64{encGauge(s.CPUPercent), encGauge(s.MemoryPercent), encGauge(s.DiskPercent),
 		encGauge(s.Load1), encGauge(s.Load5), encGauge(s.Load15)}
 	memUsed, err := encU64(s.MemoryUsed)

@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -16,7 +15,7 @@ func utcDay(t time.Time) int64 { return t.UTC().Unix() / 86400 }
 
 // logBudget is the tenant's bytes left today, read in the batch transaction
 // so two concurrent batches cannot both spend the same remainder.
-func logBudget(ctx context.Context, tx *sql.Tx, tk, day int64) (int64, error) {
+func logBudget(ctx context.Context, tx *batchTx, tk, day int64) (int64, error) {
 	var limit, used int64
 	if err := tx.QueryRowContext(ctx, `SELECT log_bytes_per_day FROM tenants WHERE key = ?`, tk).Scan(&limit); err != nil {
 		return 0, fmt.Errorf("log quota: %w", err)
@@ -29,7 +28,7 @@ func logBudget(ctx context.Context, tx *sql.Tx, tk, day int64) (int64, error) {
 }
 
 // writeLogs stores redacted lines; the FTS index follows by trigger.
-func writeLogs(ctx context.Context, tx *sql.Tx, tk, hk int64, lines []domain.LogLine) error {
+func writeLogs(ctx context.Context, tx *batchTx, tk, hk int64, lines []domain.LogLine) error {
 	for _, l := range lines {
 		labels := l.Labels
 		if labels == nil {
@@ -49,7 +48,7 @@ func writeLogs(ctx context.Context, tx *sql.Tx, tk, hk int64, lines []domain.Log
 
 // recordLogUsage meters the batch — even when no line was stored, so lines
 // dropped, shed or redacted away are always attributable (OLD C-M11).
-func recordLogUsage(ctx context.Context, tx *sql.Tx, tk, hk, day int64, p ingest.Prepared) error {
+func recordLogUsage(ctx context.Context, tx *batchTx, tk, hk, day int64, p ingest.Prepared) error {
 	st := p.LogStats
 	if st.Received == 0 {
 		return nil

@@ -1,0 +1,26 @@
+# nfpm config for sentrix-agent (.deb and .rpm). Built by scripts/package.sh.
+name: sentrix-agent
+arch: ${GOARCH}
+platform: linux
+version: ${SENTRIX_VERSION}
+section: admin
+priority: optional
+maintainer: MerhiOPS <noreply@users.noreply.github.com>
+description: Sentrix agent — lightweight server monitoring.
+homepage: https://github.com/MerhiOPS/sentrix
+license: Proprietary
+contents:
+  - src: dist/linux-${GOARCH}/sentrix-agent
+    dst: /usr/bin/sentrix-agent
+    file_info: { mode: 0755 }
+  - src: packaging/systemd/sentrix-agent.service
+    dst: /lib/systemd/system/sentrix-agent.service
+    file_info: { mode: 0644 }
+  - src: packaging/default/sentrix-agent
+    dst: /etc/default/sentrix-agent
+    type: config|noreplace
+    file_info: { mode: 0644 }
+scripts:
+  preinstall: packaging/scripts/agent-preinstall.sh
+  postinstall: packaging/scripts/agent-postinstall.sh
+  preremove: packaging/scripts/agent-preremove.sh

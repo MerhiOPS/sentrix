@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/app/alerting"
+	"github.com/MerhiOPS/sentrix/internal/domain"
 	"github.com/MerhiOPS/sentrix/internal/infra/notify"
 	"github.com/MerhiOPS/sentrix/internal/infra/sqlite"
 )
@@ -22,6 +23,13 @@ func startAlerting(ctx context.Context, st *sqlite.Store) {
 	eval := alerting.NewEvaluator(alerting.Deps{
 		Tenants: st, Hosts: st, Rules: st, Channels: st, Silences: st, States: st, Buckets: st,
 	}, out, time.Now)
+	if ops, err := domain.NewOpsScope("startup sweep of undelivered alerts"); err == nil {
+		if n, err := st.FailUndelivered(ctx, ops, alerting.UndeliveredReason); err != nil {
+			log.Error("sweep undelivered alerts", "err", err)
+		} else if n > 0 {
+			log.Warn("alerts left undelivered by the previous run marked failed", "events", n)
+		}
+	}
 	go out.Run(ctx)
 	go func() {
 		t := time.NewTicker(evalPoll)

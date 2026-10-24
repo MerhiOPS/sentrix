@@ -2,6 +2,7 @@ import type { Host } from "../api/endpoints";
 import { formatAge, formatBytes, formatPercent } from "../lib/format";
 import type { TimeBuffer } from "../lib/ringbuffer";
 import { hostHref } from "../hooks/useRoute";
+import { healthNotes } from "../lib/health";
 import { liveStatus } from "../lib/status";
 import { LiveChart } from "./LiveChart";
 import { StatusBadge } from "./StatusBadge";
@@ -37,6 +38,9 @@ export function HostCard({ host, buffer, version, now }: {
       <LiveChart buffer={buffer} version={version} />
       <footer>
         {host.os} · agent {host.agent_version} · {lastMs ? formatAge(now - lastMs) : "never reported"}
+        {healthNotes(host.health).map((n) => (
+          <div key={n.text} className={n.bad ? "error" : "muted"}>{n.text}</div>
+        ))}
       </footer>
     </article>
   );

@@ -5,6 +5,128 @@ why. Newest first.
 
 ---
 
+## Phase 6 — Hardening + packaging · 2026-10-24
+
+**Landed**
+- **Agent disk WAL** replacing the in-memory buffer: one file per batch,
+  written atomically (temp + fsync + rename), loaded in seq order at start
+  (torn files and temp leftovers discarded and counted). Bounded at 100 MB
+  (drop oldest, counted) and 71 h (the server refuses samples past 72 h).
+  A failed write is a counted drop and returns an error, so log positions
+  are not advanced for lines that were not kept. Positions now advance once
+  the batch is in the WAL (it is resent until acked or dropped and counted).
+  FIFO replay with jittered exponential backoff and a 100 ms pace (10
+  batches/s) while a backlog drains.
+- WAL depth and drops already rode in `agent_stats`; now shown on the host
+  card (only when abnormal: drops, refused samples, backlog > 1, skew > 30 s).
+- **Per-host ingest rate cap**: token bucket 20 req/s, burst 40 → `429` +
+  `Retry-After`, nothing stored; the agent keeps the batch.
+- **Retention janitor** (see Deviations): per `(tenant, host)` bounded
+  deletes (5 000 rows, 10 ms pause between batches so ingest interleaves),
+  every kind with its own horizon (raw 7 d, details 7 d, processes 3 d,
+  1m rollups 30 d, 1h rollups 400 d, logs 14 d — FTS rows go with the log
+  rows via the trigger), then `incremental_vacuum` and a bounded FTS merge
+  (never a full `optimize`, which would hold the writer). `ttl_overdue` is
+  measured after every run — including for hosts whose pruning failed.
+- **Probes**: `/healthz` (alive, no dependency checks), `/readyz` (a read on
+  the reader pool and on the writer within 2 s, else 503), `/api/v1/system`
+  (admin: fleet counts, worst host lag, agent WAL depth/drops; DB and `-wal`
+  size, disk headroom, `ttl_overdue`, janitor last run, WS subscribers and
+  drops, writer waits).
+- **Windows**: credential DPAPI-encrypted under the service's own account on
+  its first start (encrypting at enroll time would bind it to the admin who
+  ran enroll, and the service could never read it); state directory ACL
+  replaced by a protected DACL for SYSTEM, Administrators and the virtual
+  account. `sentrix-agent install|uninstall` registers the service as
+  `NT SERVICE\sentrix-agent` (not LocalSystem) with restart-on-failure; the
+  binary answers the Service Control Manager and logs to `agent.log`
+  (rotated at 10 MiB).
+- **Packaging**: nfpm `.deb`/`.rpm` for agent and server, amd64 and arm64;
+  hardened systemd units (`ProtectSystem=strict`, no capabilities, state
+  directories 0700); the agent runs as `sentrix-agent` in `adm` and
+  `systemd-journal` where those groups exist; RHEL's root-only
+  `/var/log/messages` documented (`CAP_DAC_READ_SEARCH`), not granted.
+  Windows zip with install steps. `scripts/package.sh` builds all of it with
+  SHA256SUMS. `version` reports the commit (from Go's embedded VCS info).
+- Alerts left undelivered by a previous run are marked failed at startup
+  (deferred from Phase 5).
+- `docs/runbook.md`: disk full, DB/`-wal` growth, a tenant flooding logs, an
+  agent stuck replaying, revoked/disabled credential and pin mismatch,
+  restore (stop-and-copy until Phase 7's backup).
+
+**Acceptance**
+- kill the server 2 min under load → agent replays, zero loss, no
+  duplicates — `scripts/outage.sh` against the real binaries: `kill -9`,
+  120 s down, 240 s span, **0 missing 5 s slots, 0 re-applied samples,
+  0 agent drops** ✅; in-process version `TestServerOutageLosesNothing` ✅
+- kill the agent mid-batch → no duplicates — `TestAgentKilledThenRestartedNoDuplicates`
+  (WAL full of unsent batches + one batch stored whose ack was lost; restarted
+  agent: rows = samples kept, conflict counter 0, so the replay gate — not the
+  primary key — deduplicated) ✅
+- WAL past cap drops oldest and reports the count — `TestWALPastCapDropsOldestAndCounts` ✅
+- shed test keeps metrics flowing — `TestOverQuotaShedsLogsKeepsMetrics`, `TestLowDiskShedsLogsKeepsMetrics` (Phase 4) ✅
+- changed server key makes a pinned agent fail, not warn — `TestPinnedClientAcceptsOnlyThePinnedKey`,
+  `TestEnrollRefusesWrongPinBeforeSendingSecret` (the pinned client refuses the handshake) ✅
+- `--insecure` on a public address refuses to start — `TestCheckListen` ✅
+- `.deb` installs and survives reboot on a clean VM — **not done**: no VM or
+  container runtime on this machine. Packages built and inspected
+  (`dpkg-deb --info/-c`: binary, unit, conffile, maintainer scripts), units
+  pass `systemd-analyze verify`. Open.
+- Windows service — DPAPI round trip and the protected ACL tested on the
+  Windows CI runner; the service install/run itself has **not** been run on
+  a real Windows host. Open.
+- ingest ceiling benchmarked — below ✅
+
+**Measured** — `BenchmarkIngestCeiling` (`go test ./internal/e2e -run '^$'
+-bench IngestCeiling -benchtime 20000x`): the full server path (HTTP
+handler, gzip + JSON decode, credential cache, validation, counter folding,
+rollups, detail series, one SQLite transaction per batch), 8 concurrent
+clients, 1 000 hosts, each batch = 2 core samples + 36 detail values
+(8 cores, 2 mounts, 2 disks, 2 NICs), i5-13400F:
+
+| | batches/s | hosts at 5 s (one batch / 10 s) |
+|---|---|---|
+| before | ~580 | ~5 800 |
+| with prepared statements | **840–940** | **~8 400–9 400** |
+
+The profile showed SQLite's SQL parser at ~30 % of CPU: every row's INSERT
+was parsed again. Ingest statements are now prepared once on the writer
+connection and reused through `Tx.StmtContext`. The first version
+**deadlocked** — preparing on the pool inside a transaction waits for the
+only writer connection, which the transaction holds — so the cache never
+prepares inside a transaction: a miss runs unprepared and is prepared once
+the writer is free. Encoding runs in the timed loop, so the figures are
+conservative. Binaries: agent 7.3 MB, server 13.4 MB (stripped, with the
+dashboard).
+
+**Mutation testing** — 26 mutations of the Phase 6 guards (WAL cap, age,
+reload, discard/drop counting, failed-write accounting, positions on failed
+write, replay pace, rate cap and its refill, per-host buckets, Retry-After,
+janitor batch loop, overdue, compaction, every host predicate in the prune
+SQL, the LIMIT, memstore rollup source and target ownership, the undelivered
+sweep's predicate, readiness, the system endpoint's role, build info), each
+compile-checked first: all killed. One survived on the first pass — pruning
+details with the host predicate removed, because the sibling host in the
+test had no details; it does now.
+
+**Caught before shipping**
+- The janitor skipped measuring `ttl_overdue` for a host whose pruning
+  failed — exactly the host it exists to report (test written first).
+- The prepared-statement cache deadlock above.
+- The runbook first claimed agents replay data acknowledged after a backup;
+  they do not (acked batches leave the WAL). Corrected: a restore loses what
+  was acknowledged since the copy.
+
+**Deviations**
+- The retention janitor was in PLAN §4 but in no phase, while Phase 6's
+  system report needs `ttl_overdue`. Built here with global defaults;
+  Phase 7's plans make the horizons per tenant.
+- `/api/v1/system` shows server-wide figures (DB size, disk) to every
+  tenant's admins. Fine for a self-hosted single company; a hosted
+  multi-tenant deployment needs an operator role (Phase 7).
+
+---
+
 ## Phase 5 — Alerts · 2026-10-24
 
 **Landed**

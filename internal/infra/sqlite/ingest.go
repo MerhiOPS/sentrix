@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
@@ -14,11 +13,13 @@ import (
 // seq record. Anything failing rolls all of it back (R1 by construction).
 func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.HostID, seq uint64,
 	build ingest.BuildFunc) (ingest.CommitResult, error) {
-	tx, err := s.db.Writer().BeginTx(ctx, nil)
+	raw, err := s.db.Writer().BeginTx(ctx, nil)
 	if err != nil {
 		return ingest.CommitResult{}, fmt.Errorf("begin batch: %w", err)
 	}
-	defer tx.Rollback() //nolint:errcheck // no-op after Commit
+	defer s.stmts.learn(ctx) // runs last: after Rollback has released the writer
+	defer raw.Rollback()     //nolint:errcheck // no-op after Commit
+	tx := &batchTx{Tx: raw, stmts: s.stmts}
 
 	tk, err := tenantKey(ctx, tx, sc)
 	if err != nil {
@@ -70,7 +71,7 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	return res, nil
 }
 
-func seenSeq(ctx context.Context, tx *sql.Tx, tk, hk, seq int64) (bool, error) {
+func seenSeq(ctx context.Context, tx *batchTx, tk, hk, seq int64) (bool, error) {
 	var n int
 	err := tx.QueryRowContext(ctx,
 		`SELECT count(*) FROM ingest_batches WHERE tenant_key = ? AND host_key = ? AND seq = ?`,
@@ -83,7 +84,7 @@ func seenSeq(ctx context.Context, tx *sql.Tx, tk, hk, seq int64) (bool, error) {
 
 // recordSeq stores the replay record and prunes this host's records older
 // than p.SeqRetention — cheap per batch, bounded per host.
-func recordSeq(ctx context.Context, tx *sql.Tx, tk, hk, seq int64, p ingest.Prepared) error {
+func recordSeq(ctx context.Context, tx *batchTx, tk, hk, seq int64, p ingest.Prepared) error {
 	now := encTime(p.ReceivedAt)
 	if _, err := tx.ExecContext(ctx,
 		`INSERT INTO ingest_batches (tenant_key, host_key, seq, received_at) VALUES (?, ?, ?, ?)`,

@@ -32,6 +32,29 @@ func testRetentionPrunesOnlyOldRowsOfItsKind(t *testing.T, st Stores) {
 	}
 	tg := retention.Target{Tenant: f.tenant, Host: f.host}
 	cut := T0.Add(time.Hour)
+	// A second host of the same tenant with the same old data: pruning the
+	// first must not touch it (every delete is per host).
+	sibling, _ := enroll(t, st, f.scope, "sibling")
+	if _, err := st.CommitBatch(ctx, f.scope, sibling.ID, 9, prepared(T0, []int{0, 1}, []uint64{1, 2})); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CommitBatch(ctx, f.scope, sibling.ID, 10, withLogs(nil, line(0, domain.LevelInfo, "sibling-ancient"))); err != nil {
+		t.Fatal(err)
+	}
+	sd := detail(0, domain.MetricCPUCore, domain.KindGauge, domain.Labels{"core": "0"}, 7)
+	if _, err := st.CommitBatch(ctx, f.scope, sibling.ID, 11, withDetails(ingest.DefaultWindow.SeqRetention(), sd)); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		raw, _ := st.RawCore(ctx, f.scope, sibling.ID, T0.Add(-time.Hour), T0.Add(3*time.Hour))
+		rs, _ := st.Rollups(ctx, f.scope, sibling.ID, query.Res1m, T0.Add(-time.Hour), T0.Add(3*time.Hour))
+		clauses, _ := query.ParseSearch("sibling-ancient")
+		logs, _ := st.SearchLogs(ctx, f.scope, query.LogQuery{Clauses: clauses, From: T0.Add(-time.Hour), To: T0.Add(time.Hour), Limit: 10})
+		_, hasDetail, _ := st.OldestHost(ctx, ops, retention.Target{Tenant: f.tenant, Host: sibling.ID}, domain.DataDetail)
+		if len(raw) != 2 || len(rs) != 1 || len(logs) != 1 || !hasDetail {
+			t.Errorf("pruning one host touched its sibling: raw %d rollups %d logs %d details %v", len(raw), len(rs), len(logs), hasDetail)
+		}
+	}()
 
 	if n, err := st.PruneHost(ctx, ops, tg, domain.DataRawCore, cut, 2); err != nil || n != 2 {
 		t.Fatalf("first raw batch: %d, %v; want the limit of 2", n, err)

@@ -146,3 +146,17 @@ func mustPush(t *testing.T, w *WAL, p Pending) {
 		t.Fatal(err)
 	}
 }
+
+// A backlog drains at a bounded rate: after an ack with more waiting, the
+// next send waits replayPace; with nothing waiting, it does not.
+func TestShipperPacesReplay(t *testing.T) {
+	s, buf, _ := newTestShipper(t, 200, 200)
+	mustPush(t, buf, pending(t, 1))
+	mustPush(t, buf, pending(t, 2))
+	if wait := s.handle(context.Background(), pending(t, 1)); wait != replayPace {
+		t.Fatalf("ack with a backlog waited %v, want %v", wait, replayPace)
+	}
+	if wait := s.handle(context.Background(), pending(t, 2)); wait != 0 {
+		t.Fatalf("ack of the last batch waited %v, want 0", wait)
+	}
+}
