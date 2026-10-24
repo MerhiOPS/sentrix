@@ -5,6 +5,74 @@ why. Newest first.
 
 ---
 
+## Phase 2 — Read path + dashboard shell · 2026-10-24
+
+**Landed**
+- Users and sessions: email unique across tenants (it finds the tenant at
+  login); Argon2id (46 MiB, t=1, p=1, semaphore of 2; tampered parameters in a
+  stored hash are refused, not allocated); session tokens stored as SHA-256,
+  minted fresh on every login, idle 12 h / absolute 7 d, `LastSeen` written at
+  most once a minute; the role is read live from the user on every request.
+- Login: unknown emails still cost one full verification against a dummy hash
+  (timing does not reveal which emails exist); all failures are one generic
+  401; throttling per account+client with a **bounded limiter that fails
+  closed** when full (failing open would let a junk-key flood unthrottle a
+  real account).
+- Read side: `LatestReader` (fleet grid never scans history), metrics use case
+  with columnar frames, NaN → JSON `null` gaps (OLD B13), and a point cap that
+  refuses with or without `step` (OLD B1/B8).
+- Live path: ingest publishes **after commit** only (never for replays) into
+  `livehub` — per-host bounded ring, newest-first backfill (OLD B6), tenant
+  filtering inside the hub, slow subscribers dropped instead of blocking ingest.
+- HTTP API: session cookie (HttpOnly, Secure, SameSite=Strict), `Origin`
+  required on state-changing requests and the WebSocket upgrade, 404 (not 403)
+  for another tenant's resources with a body identical to an unknown id,
+  security headers + CSP, admin-only enrollment-token endpoint.
+- `docs/openapi.yaml` is the source: TS types generated (CI drift check), and
+  **every Go response in the API tests is validated against it** — including a
+  check that every returned status is documented (kin-openapi accepts
+  undocumented statuses; the test does not).
+- Dashboard: React 19 + TanStack Query + uPlot; login, fleet grid with live
+  CPU/memory charts, live values, status badges ("No data from host", never
+  "down"), admin "Add a host" token flow. One WebSocket for all hosts;
+  reconnect resumes from the oldest host's latest point, overlap deduped.
+- Server: two listeners — ingest (TLS) and dashboard (`127.0.0.1:8080`,
+  plain HTTP refused off loopback without `--api-tls`); `user create` CLI
+  reads the password without echo, never from a flag.
+
+**Acceptance**
+- fleet grid updates live — manual run in Chromium (screenshots), `TestStreamDeliversOwnTenantAfterCommit` ✅
+- viewer cannot call admin endpoints — `TestViewerCannotCallAdminEndpoints`, manual curl ✅
+- tenant B gets 404 for tenant A's host and no WS frames — `TestOtherTenantsHostIs404Everywhere`,
+  `TestStreamGivesNoFramesForAnotherTenantsHost`, `TestTenantIsolationInHub` ✅
+- point-cap rejection with and without `step` — `TestMetricsPointCapAndNullGaps`, `TestSeriesPointCapWithAndWithoutStep` ✅
+- reconnect backfill produces no duplicate points — `liveFeed.test.ts`, `ringbuffer.test.ts`,
+  `TestStreamBackfillSinceOnReconnect`, `TestBackfillSinceIsBoundedAndNewerOnly` ✅
+
+**Observed in the manual run**
+- WebSocket held open 45 s with frames flowing: the ingest server's 30 s
+  `ReadTimeout` does not survive the upgrade.
+- Server restarted under a live agent: the agent retried the same `batch_seq`
+  with jittered backoff (732 ms, 6.3 s); afterwards **340 samples over 678 s at
+  2 s with zero gaps**, zero conflicts, zero drops.
+- A stale Phase 1 server still bound to the ingest port: the agent's pinned
+  enrollment refused it — "server key does not match the pinned key".
+
+**Deviations**
+- TypeScript 7 → **5.9.3**: openapi-typescript needs TypeScript's JS compiler
+  API, which the native TS 7 compiler does not provide.
+- `web/dist/` commits only `.gitkeep`, not a stub `index.html`: a tracked stub
+  is overwritten by every build and invites committing build output. A server
+  built without the UI logs a warning and serves the API only.
+
+**Deferred**
+- Disabling users and hosts (ports, CLI, UI) — the read paths already honour
+  `disabled_at`; nothing writes it yet. Phase 5 (disabled hosts are part of
+  alerting) or Phase 7 (erasure), whichever needs it first.
+- Host detail page and rollups — Phase 3, as planned.
+
+---
+
 ## Phase 1 — Walking skeleton · 2026-10-24
 
 **Landed**

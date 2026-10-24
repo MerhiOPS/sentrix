@@ -3,6 +3,7 @@
 //	sentrix-server serve        --data DIR [--listen :8443] [--insecure] [--tls-cert F --tls-key F]
 //	sentrix-server tenant create --data DIR --name NAME
 //	sentrix-server token create  --data DIR --tenant ID [--tls-cert F]
+//	sentrix-server user create   --data DIR --tenant ID --email E [--role admin|viewer]
 package main
 
 import (
@@ -28,6 +29,8 @@ func run(args []string) error {
 		return subcommand(rest, "create", tenantCreate)
 	case "token":
 		return subcommand(rest, "create", tokenCreate)
+	case "user":
+		return subcommand(rest, "create", userCreate)
 	case "version":
 		fmt.Println(version)
 		return nil
@@ -44,7 +47,7 @@ func subcommand(args []string, name string, fn func([]string) error) error {
 }
 
 func usage() error {
-	return fmt.Errorf("usage: sentrix-server serve|tenant create|token create|version (see --help on each)")
+	return fmt.Errorf("usage: sentrix-server serve|tenant create|token create|user create|version (see --help on each)")
 }
 
 // version is set at build time with -ldflags "-X main.version=...".

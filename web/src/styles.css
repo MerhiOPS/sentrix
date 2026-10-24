@@ -1,0 +1,33 @@
+:root { color-scheme: dark; --bg: #12151c; --card: #1b1f29; --line: #2a2f3a; --text: #e6e9ef; --muted: #8a93a6;
+  --ok: #3ccf8e; --stale: #f2a33a; --nodata: #ef5b5b; font-family: system-ui, sans-serif; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); }
+.muted { color: var(--muted); }
+.error { color: var(--nodata); }
+.center { text-align: center; margin-top: 20vh; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+.login { display: grid; place-items: center; min-height: 100vh; }
+.login form { width: 320px; display: grid; gap: 12px; }
+label { display: grid; gap: 4px; font-size: 14px; }
+input { padding: 8px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); color: var(--text); }
+button { padding: 8px 12px; border-radius: 6px; border: 0; background: #4f8cff; color: white; cursor: pointer; }
+button.link { background: none; color: var(--muted); padding: 0; }
+.topbar { display: flex; gap: 16px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--line); }
+.topbar .link { margin-left: auto; }
+main { padding: 20px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(352px, 1fr)); gap: 16px; }
+.host header { display: flex; justify-content: space-between; align-items: center; }
+.host h2 { font-size: 16px; margin: 0; }
+.host footer { font-size: 12px; color: var(--muted); margin-top: 8px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); margin: 12px 0; }
+.stats dt { font-size: 11px; color: var(--muted); }
+.stats dd { margin: 0; font-size: 18px; }
+.badge { font-size: 12px; padding: 2px 8px; border-radius: 999px; }
+.badge-ok { background: #1d3b30; color: var(--ok); }
+.badge-stale { background: #3b301d; color: var(--stale); }
+.badge-no_data, .badge-disabled { background: #3b1d1d; color: var(--nodata); }
+.token { margin-bottom: 16px; }
+.token code { word-break: break-all; }
+.chart { margin: 0; }
+.chart figcaption { display: flex; gap: 12px; font-size: 11px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 2px; margin-right: 4px; vertical-align: middle; }

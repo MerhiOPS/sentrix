@@ -10,50 +10,58 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
-	"time"
 
-	"github.com/MerhiOPS/sentrix/internal/app/identity"
-	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/infra/ingesthttp"
 	"github.com/MerhiOPS/sentrix/internal/infra/tlscert"
 )
 
-// Credential cache: a disabled host can keep sending for at most authTTL.
-const (
-	authTTL   = 30 * time.Second
-	authCache = 10_000
-)
+type serveFlags struct {
+	data, listen, apiListen, origins string
+	insecure, apiTLS                 bool
+	tls                              tlsFlags
+}
 
-// serve: sentrix-server serve --data DIR [--listen ADDR] [--insecure]
-func serve(args []string) error {
+func parseServe(args []string) (serveFlags, error) {
+	var f serveFlags
 	fs := flag.NewFlagSet("serve", flag.ContinueOnError)
-	data := fs.String("data", "", "data directory")
-	listen := fs.String("listen", ":8443", "ingest listen address")
-	insecure := fs.Bool("insecure", false, "plain HTTP (loopback addresses only)")
-	var tf tlsFlags
-	tf.register(fs)
+	fs.StringVar(&f.data, "data", "", "data directory")
+	fs.StringVar(&f.listen, "listen", ":8443", "agent ingest address (TLS)")
+	fs.BoolVar(&f.insecure, "insecure", false, "plain HTTP ingest (loopback addresses only)")
+	fs.StringVar(&f.apiListen, "api-listen", "127.0.0.1:8080", "dashboard address")
+	fs.BoolVar(&f.apiTLS, "api-tls", false, "serve the dashboard over TLS (required off loopback)")
+	fs.StringVar(&f.origins, "api-origins", "", "extra allowed origins, comma-separated (dev server)")
+	f.tls.register(fs)
 	if err := fs.Parse(args); err != nil {
-		return err
+		return f, err
 	}
-	if err := ingesthttp.CheckListen(*listen, *insecure); err != nil {
+	if err := ingesthttp.CheckListen(f.listen, f.insecure); err != nil {
+		return f, err
+	}
+	if err := ingesthttp.CheckListen(f.apiListen, !f.apiTLS); err != nil {
+		return f, errors.New("dashboard: " + err.Error() + " — pass --api-tls or keep it on loopback behind a TLS proxy")
+	}
+	return f, nil
+}
+
+// serve runs the ingest and dashboard listeners until SIGINT/SIGTERM.
+func serve(args []string) error {
+	f, err := parseServe(args)
+	if err != nil {
 		return err
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-
-	st, closeDB, err := openStore(ctx, *data)
+	st, closeDB, err := openStore(ctx, f.data)
 	if err != nil {
 		return err
 	}
-	auth := ingest.NewAuthenticator(st, authTTL, authCache, time.Now)
-	svc := ingest.NewService(st, ingest.DefaultWindow, time.Now)
-	h := ingesthttp.NewHandler(auth, svc, identity.NewEnrollment(st, time.Now))
-
 	var tlsCfg *tls.Config
-	if !*insecure {
-		cert, pin, err := tf.load(*data)
-		if err != nil {
+	var pin []byte
+	if !f.insecure || f.apiTLS {
+		var cert tls.Certificate
+		if cert, pin, err = f.tls.load(f.data); err != nil {
 			return errors.Join(err, closeDB())
 		}
 		tlsCfg = tlscert.ServerConfig(cert)
@@ -61,34 +69,60 @@ func serve(args []string) error {
 			slog.Info("self-signed TLS", "spki_pin", hex.EncodeToString(pin))
 		}
 	}
-	srv := ingesthttp.NewServer(*listen, h, tlsCfg)
-	return errors.Join(runServer(ctx, srv), closeDB())
+	h, err := build(ctx, st, pin, splitList(f.origins))
+	if err != nil {
+		return errors.Join(err, closeDB())
+	}
+	ingestSrv := ingesthttp.NewServer(f.listen, h.ingest, pick(!f.insecure, tlsCfg))
+	apiSrv := ingesthttp.NewServer(f.apiListen, h.dashboard, pick(f.apiTLS, tlsCfg))
+	return errors.Join(runServers(ctx, ingestSrv, apiSrv), closeDB())
 }
 
-// runServer serves until ctx ends, then shuts down gracefully: in-flight
-// batches finish (and commit) before the database closes.
-func runServer(ctx context.Context, srv *http.Server) error {
-	errc := make(chan error, 1)
-	go func() {
-		slog.Info("ingest listening", "addr", srv.Addr, "tls", srv.TLSConfig != nil)
-		var err error
-		if srv.TLSConfig != nil {
-			err = srv.ListenAndServeTLS("", "")
-		} else {
-			err = srv.ListenAndServe()
+func pick(on bool, cfg *tls.Config) *tls.Config {
+	if on {
+		return cfg
+	}
+	return nil
+}
+
+func splitList(s string) []string {
+	var out []string
+	for _, p := range strings.Split(s, ",") {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
 		}
-		if !errors.Is(err, http.ErrServerClosed) {
-			errc <- err
-		}
-		close(errc)
-	}()
+	}
+	return out
+}
+
+// runServers serves until ctx ends or one listener fails, then shuts both
+// down gracefully: in-flight batches commit before the database closes.
+func runServers(ctx context.Context, srvs ...*http.Server) error {
+	errc := make(chan error, len(srvs))
+	for _, s := range srvs {
+		go func(s *http.Server) {
+			slog.Info("listening", "addr", s.Addr, "tls", s.TLSConfig != nil)
+			var err error
+			if s.TLSConfig != nil {
+				err = s.ListenAndServeTLS("", "")
+			} else {
+				err = s.ListenAndServe()
+			}
+			if !errors.Is(err, http.ErrServerClosed) {
+				errc <- err
+			}
+		}(s)
+	}
+	var first error
 	select {
-	case err := <-errc:
-		return err
+	case first = <-errc:
 	case <-ctx.Done():
 	}
 	slog.Info("shutting down")
-	sctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	sctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return srv.Shutdown(sctx)
+	for _, s := range srvs {
+		first = errors.Join(first, s.Shutdown(sctx))
+	}
+	return first
 }

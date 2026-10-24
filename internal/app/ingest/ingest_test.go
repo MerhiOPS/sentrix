@@ -156,6 +156,37 @@ func TestIngestReplayReportsNoRejections(t *testing.T) {
 	}
 }
 
+type recPub struct{ got [][]domain.CoreSample }
+
+func (r *recPub) PublishCore(_ domain.TenantID, _ domain.HostID, s []domain.CoreSample) {
+	r.got = append(r.got, s)
+}
+
+func TestPublishesOnlyAfterCommitAndNeverReplays(t *testing.T) {
+	st := newFake()
+	svc := newSvc(st)
+	pub := &recPub{}
+	svc.SetPublisher(pub)
+	ah := authHost()
+	b := Batch{Seq: 1, Samples: []domain.CoreSample{sample(0, 1)}}
+	st.err = errors.New("disk full")
+	if _, err := svc.Ingest(context.Background(), ah, b); err == nil {
+		t.Fatal("store failure swallowed")
+	}
+	if len(pub.got) != 0 {
+		t.Fatal("published samples the store failed to write")
+	}
+	st.err = nil
+	for i := 0; i < 2; i++ {
+		if _, err := svc.Ingest(context.Background(), ah, b); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(pub.got) != 1 || len(pub.got[0]) != 1 {
+		t.Fatalf("published %d times, want once (the replay must not republish)", len(pub.got))
+	}
+}
+
 func TestIngestUsesHostIntervalWhenBatchIntervalInvalid(t *testing.T) {
 	st := newFake()
 	ah := authHost()

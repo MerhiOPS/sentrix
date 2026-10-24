@@ -20,10 +20,13 @@ import (
 type Stores interface {
 	identity.TenantRepo
 	identity.EnrollmentRepo
+	identity.UserRepo
+	identity.SessionRepo
 	ingest.CredentialStore
 	ingest.Store
 	query.HostReader
 	query.CoreReader
+	query.LatestReader
 }
 
 // Factory builds a fresh, empty adapter for one test.
@@ -32,12 +35,15 @@ type Factory func(t *testing.T) Stores
 // T0 is the fixed clock every contract case starts from.
 var T0 = time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 
-// fixture is a tenant with one enrolled host and its credential hash.
+// fixture is a tenant with one enrolled host (and its credential hash), one
+// user and one session.
 type fixture struct {
 	scope    domain.Scope
 	tenant   domain.TenantID
 	host     domain.HostID
 	credHash []byte
+	user     domain.UserID
+	session  []byte // token hash
 }
 
 func mustOps(t *testing.T) domain.OpsScope {
@@ -90,7 +96,8 @@ func newFixture(t *testing.T, st Stores, name string) fixture {
 	t.Helper()
 	s, tid := newTenant(t, st, name)
 	h, cred := enroll(t, st, s, name+"-host")
-	return fixture{scope: s, tenant: tid, host: h.ID, credHash: cred}
+	u := newUser(t, st, s, name+"-"+domain.NewID().String()+"@example.com", domain.RoleAdmin)
+	return fixture{scope: s, tenant: tid, host: h.ID, credHash: cred, user: u.ID, session: newSession(t, st, s, u)}
 }
 
 // prepared builds a BuildFunc that stores samples at the given offsets (in

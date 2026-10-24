@@ -158,6 +158,21 @@ func testHealthPersisted(t *testing.T, st Stores) {
 	}
 }
 
+// testLatestNeverGoesBackwards: the fleet grid shows the newest sample, and a
+// late batch carrying older samples cannot move it back.
+func testLatestNeverGoesBackwards(t *testing.T, st Stores) {
+	f := newFixture(t, st, "a")
+	commit(t, st, f, 1, prepared(T0, []int{3}, []uint64{30}))
+	commit(t, st, f, 2, prepared(T0, []int{1}, []uint64{10})) // older, arrives later
+	got, err := st.LatestCore(context.Background(), f.scope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if s, ok := got[f.host]; !ok || !s.TS.Equal(T0.Add(15*time.Second)) || s.NetRxBytes != 30 {
+		t.Fatalf("latest = %+v (present %v), want the ts=15s sample", s, ok)
+	}
+}
+
 func testGaugePrecision(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
 	commit(t, st, f, 1, prepared(T0, []int{0}, []uint64{1})) // cpu 12.345

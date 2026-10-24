@@ -63,6 +63,13 @@ type CommitResult struct {
 	Conflicts int
 }
 
+// Publisher receives samples after they are durably stored — never before
+// (R1: a live chart must not show a point the database then lost). It must
+// not block: the ingest path waits on it.
+type Publisher interface {
+	PublishCore(tenant domain.TenantID, host domain.HostID, samples []domain.CoreSample)
+}
+
 // Store persists a batch as one unit of work: raw rows, latest values,
 // counter state, host liveness and the batch_seq record, in one transaction.
 // An adapter that cannot do this atomically must document which half can

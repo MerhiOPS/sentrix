@@ -24,7 +24,7 @@ id_ed25519*
 # node
 node_modules/
 web/dist/*
-!web/dist/index.html
+!web/dist/.gitkeep
 
 # misc
 *.log

@@ -16,10 +16,12 @@ import (
 
 // Store holds everything behind one mutex. Correctness, not speed.
 type Store struct {
-	mu      sync.Mutex
-	tenants map[domain.TenantID]domain.Tenant
-	tokens  map[string]*token // by secret hash
-	hosts   map[domain.HostID]*host
+	mu       sync.Mutex
+	tenants  map[domain.TenantID]domain.Tenant
+	tokens   map[string]*token // by secret hash
+	hosts    map[domain.HostID]*host
+	users    map[domain.UserID]*user
+	sessions map[string]*session // by token hash
 }
 
 type token struct {
@@ -40,9 +42,11 @@ type host struct {
 // New returns an empty store.
 func New() *Store {
 	return &Store{
-		tenants: map[domain.TenantID]domain.Tenant{},
-		tokens:  map[string]*token{},
-		hosts:   map[domain.HostID]*host{},
+		tenants:  map[domain.TenantID]domain.Tenant{},
+		tokens:   map[string]*token{},
+		hosts:    map[domain.HostID]*host{},
+		users:    map[domain.UserID]*user{},
+		sessions: map[string]*session{},
 	}
 }
 
