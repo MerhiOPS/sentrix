@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# CLAUDE.md conventions are enforced here, not by review: the line limit,
+# the import direction, SQL placement and platform imports fail the build.
+jobs:
+  go:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: gofmt
+        if: runner.os == 'Linux'
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then echo "unformatted files:"; echo "$out"; exit 1; fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      # Windows code paths are tested on Windows, not just cross-compiled.
+      - name: go test (race)
+        if: runner.os == 'Linux'
+        run: go test -race -count=1 ./...
+      - name: go test
+        if: runner.os == 'Windows'
+        run: go test -count=1 ./...
+
+      - name: cross-compile linux and windows, no cgo
+        if: runner.os == 'Linux'
+        env:
+          CGO_ENABLED: "0"
+        run: |
+          GOOS=linux   GOARCH=amd64 go build ./...
+          GOOS=windows GOARCH=amd64 go build ./...
+
+      - name: repository checks (lines, layering, rawsql, platform)
+        if: runner.os == 'Linux'
+        run: go run ./scripts/ci all
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      # The action runs `golangci-lint config verify` first, so an invalid
+      # config fails loudly. The version is pinned to the one the config was
+      # verified against locally.
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.15.0
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
