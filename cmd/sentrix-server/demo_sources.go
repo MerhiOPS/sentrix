@@ -18,16 +18,19 @@ import (
 type simCore struct {
 	mu                sync.Mutex
 	phase, base, peak float64
+	period            time.Duration
 	rx, tx, dr, dw    uint64
 	memTotal          uint64
 }
 
 func newSimCore(i int) *simCore {
-	base, peak := 35.0, 25.0
+	base, peak, period := 35.0, 25.0, 6*time.Minute
 	if i == 0 {
-		base, peak = 50, 44 // web-01 passes 85 % every few minutes: the demo alert fires
+		// web-01 stays above 80 % for ~3 minutes of every 10: the demo
+		// alert fires and resolves while you watch.
+		base, peak, period = 52, 44, 10*time.Minute
 	}
-	return &simCore{phase: float64(i) * 1.7, base: base, peak: peak, memTotal: 8 << 30}
+	return &simCore{phase: float64(i) * 1.7, base: base, peak: peak, period: period, memTotal: 8 << 30}
 }
 
 func wave(period time.Duration, phase float64) float64 {
@@ -37,7 +40,7 @@ func wave(period time.Duration, phase float64) float64 {
 func (c *simCore) Collect(context.Context) (domain.CoreSample, []error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	cpu := clamp(c.base+c.peak*wave(6*time.Minute, c.phase)+noise()*3, 1, 99)
+	cpu := clamp(c.base+c.peak*wave(c.period, c.phase)+noise()*3, 1, 99)
 	mem := clamp(48+8*wave(40*time.Minute, c.phase), 5, 95)
 	c.rx += uint64(200_000 + 150_000*(1+wave(3*time.Minute, c.phase)))
 	c.tx += uint64(80_000 + 60_000*(1+wave(3*time.Minute, c.phase+1)))
@@ -60,7 +63,7 @@ func (d *simDetail) Collect(context.Context) ([]domain.DetailSample, []error) {
 	now := time.Now()
 	var out []domain.DetailSample
 	for i := range 4 {
-		v := clamp(d.core.base+d.core.peak*wave(6*time.Minute, d.core.phase+float64(i)*0.3)+noise()*8, 0, 100)
+		v := clamp(d.core.base+d.core.peak*wave(d.core.period, d.core.phase+float64(i)*0.3)+noise()*8, 0, 100)
 		out = append(out, domain.DetailSample{TS: now, Metric: domain.MetricCPUCore, Kind: domain.KindGauge,
 			Labels: domain.Labels{"core": fmt.Sprint(i)}, Value: v})
 	}
@@ -98,16 +101,19 @@ type simLogs struct {
 	n    int
 }
 
+// Each line's number is drawn from its own range (max): an address octet
+// must stay a valid octet, or the redactor rightly leaves it alone.
 var demoLines = []struct {
 	level domain.Level
 	msg   string
+	max   int
 }{
-	{domain.LevelInfo, "GET /api/orders 200 in %d ms"},
-	{domain.LevelInfo, "user login ok: email=alice@example.com from 203.0.113.%d"},
-	{domain.LevelWarn, "slow query on orders (%d ms), consider an index"},
-	{domain.LevelInfo, "POST /api/checkout 201 in %d ms"},
-	{domain.LevelError, "payment gateway refused request %d: Authorization: Bearer sk_demo_51HxQ2eFakeTokenValue"},
-	{domain.LevelInfo, "worker processed %d jobs from the queue"},
+	{domain.LevelInfo, "GET /api/orders 200 in %d ms", 400},
+	{domain.LevelInfo, "user login ok: email=alice@example.com from 203.0.113.%d", 254},
+	{domain.LevelWarn, "slow query on orders (%d ms), consider an index", 900},
+	{domain.LevelInfo, "POST /api/checkout 201 in %d ms", 400},
+	{domain.LevelError, "payment gateway refused request %d: Authorization: Bearer sk_demo_51HxQ2eFakeTokenValue", 9999},
+	{domain.LevelInfo, "worker processed %d jobs from the queue", 500},
 }
 
 func (s *simLogs) Name() string { return "demo-app" }
@@ -119,7 +125,7 @@ func (s *simLogs) Poll(context.Context) ([]domain.LogLine, logtail.Mark, error) 
 	s.n++
 	l := demoLines[s.n%len(demoLines)]
 	return []domain.LogLine{{TS: time.Now(), Source: "/var/log/app/" + s.host + ".log", Level: l.level,
-		Message: fmt.Sprintf(l.msg, 5+simInt(400))}}, s.n, nil
+		Message: fmt.Sprintf(l.msg, 1+simInt(l.max))}}, s.n, nil
 }
 
 func (s *simLogs) Commit(m logtail.Mark) ([]byte, error) { return []byte(fmt.Sprint(m)), nil }

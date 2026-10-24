@@ -67,8 +67,8 @@ func setupDemo(ctx context.Context, st *sqlite.Store, dataDir string) (demoState
 	if _, err := identity.NewUsers(st, password.New(1), time.Now).Create(ctx, sc, demoEmail, s.Password, domain.RoleAdmin); err != nil {
 		return s, err
 	}
-	_, err = alerting.NewAdmin(st, st, st, st).CreateRule(ctx, sc, domain.AlertRule{Name: "CPU above 85 %", Kind: domain.RuleThreshold,
-		Metric: "cpu", Aggregation: domain.AggAvg, Comparator: domain.CmpGT, Threshold: 85, Duration: 2 * time.Minute,
+	_, err = alerting.NewAdmin(st, st, st, st).CreateRule(ctx, sc, domain.AlertRule{Name: "CPU above 80 %", Kind: domain.RuleThreshold,
+		Metric: "cpu", Aggregation: domain.AggAvg, Comparator: domain.CmpGT, Threshold: 80, Duration: 2 * time.Minute,
 		OnNoData: domain.NoDataHold, Cooldown: 15 * time.Minute, Enabled: true})
 	if err != nil {
 		return s, err
