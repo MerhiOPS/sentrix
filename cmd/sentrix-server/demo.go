@@ -73,7 +73,7 @@ func setupDemo(ctx context.Context, st *sqlite.Store, dataDir string) (demoState
 	if err != nil {
 		return s, err
 	}
-	b, _ := json.Marshal(s)
+	b, _ := json.Marshal(s) //nolint:gosec // the demo login, printed at every start; the file is 0600 in the data dir
 	return s, os.WriteFile(path, b, 0o600)
 }
 

@@ -37,12 +37,12 @@ func wave(period time.Duration, phase float64) float64 {
 func (c *simCore) Collect(context.Context) (domain.CoreSample, []error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	cpu := clamp(c.base+c.peak*wave(6*time.Minute, c.phase)+rand.NormFloat64()*3, 1, 99)
+	cpu := clamp(c.base+c.peak*wave(6*time.Minute, c.phase)+rand.NormFloat64()*3, 1, 99) //nolint:gosec // simulated noise, not a secret
 	mem := clamp(48+8*wave(40*time.Minute, c.phase), 5, 95)
 	c.rx += uint64(200_000 + 150_000*(1+wave(3*time.Minute, c.phase)))
 	c.tx += uint64(80_000 + 60_000*(1+wave(3*time.Minute, c.phase+1)))
-	c.dr += uint64(50_000 + rand.IntN(40_000))
-	c.dw += uint64(120_000 + rand.IntN(80_000))
+	c.dr += uint64(50_000 + rand.IntN(40_000))  //nolint:gosec // simulated noise, not a secret
+	c.dw += uint64(120_000 + rand.IntN(80_000)) //nolint:gosec // simulated noise, not a secret
 	return domain.CoreSample{TS: time.Now(), CPUPercent: cpu, MemoryPercent: mem, DiskPercent: 61 + 3*wave(time.Hour, c.phase),
 		Load1: cpu / 25, Load5: cpu / 28, Load15: cpu / 30, MemoryUsed: uint64(mem / 100 * float64(c.memTotal)),
 		UptimeSeconds: uint64(time.Since(demoStart).Seconds()) + 86_400*3,
