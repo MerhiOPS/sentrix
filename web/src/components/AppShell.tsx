@@ -14,6 +14,8 @@ export function AppShell({ me }: { me: Me }) {
     <div className="shell">
       <header className="topbar">
         <a href="#/" className="brand"><strong>{productName}</strong></a>
+        <a href="#/" className="muted">Fleet</a>
+        <a href="#/logs" className="muted">Logs</a>
         <span className="muted">{me.email} · {me.role}</span>
         <button className="link" onClick={() => logoutM.mutate()}>Sign out</button>
       </header>
@@ -25,7 +27,7 @@ export function AppShell({ me }: { me: Me }) {
           </>
         )}
         {route.page === "host" && <HostDetailPage hostId={route.hostId} tab={route.tab} range={route.range} />}
-        {route.page === "logs" && <LogsPage hostId={route.hostId} atMs={route.atMs} />}
+        {route.page === "logs" && <LogsPage hostId={route.hostId} atMs={route.atMs} isAdmin={me.role === "admin"} />}
       </main>
     </div>
   );

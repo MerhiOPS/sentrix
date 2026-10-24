@@ -69,7 +69,7 @@ func serve(args []string) error {
 			slog.Info("self-signed TLS", "spki_pin", hex.EncodeToString(pin))
 		}
 	}
-	h, err := build(ctx, st, pin, splitList(f.origins))
+	h, err := build(ctx, st, f.data, pin, splitList(f.origins))
 	if err != nil {
 		return errors.Join(err, closeDB())
 	}

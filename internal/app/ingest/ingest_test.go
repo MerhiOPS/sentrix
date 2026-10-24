@@ -19,10 +19,11 @@ type fakeStore struct {
 	prepared []Prepared
 	scopes   []domain.Scope
 	err      error
+	budget   int64
 }
 
 func newFake() *fakeStore {
-	return &fakeStore{state: map[domain.HostID]CounterState{}, seen: map[uint64]bool{}}
+	return &fakeStore{state: map[domain.HostID]CounterState{}, seen: map[uint64]bool{}, budget: 1 << 30}
 }
 
 func (f *fakeStore) CommitBatch(_ context.Context, s domain.Scope, h domain.HostID, seq uint64, build BuildFunc) (CommitResult, error) {
@@ -33,7 +34,7 @@ func (f *fakeStore) CommitBatch(_ context.Context, s domain.Scope, h domain.Host
 	if f.seen[seq] {
 		return CommitResult{Replayed: true}, nil
 	}
-	p, err := build(f.state[h])
+	p, err := build(TxState{Counters: f.state[h], LogBudget: f.budget})
 	if err != nil {
 		return CommitResult{}, err
 	}
@@ -156,10 +157,17 @@ func TestIngestReplayReportsNoRejections(t *testing.T) {
 	}
 }
 
-type recPub struct{ got [][]domain.CoreSample }
+type recPub struct {
+	got  [][]domain.CoreSample
+	logs [][]domain.LogLine
+}
 
 func (r *recPub) PublishCore(_ domain.TenantID, _ domain.HostID, s []domain.CoreSample) {
 	r.got = append(r.got, s)
+}
+
+func (r *recPub) PublishLogs(_ domain.TenantID, _ domain.HostID, l []domain.LogLine) {
+	r.logs = append(r.logs, l)
 }
 
 func TestPublishesOnlyAfterCommitAndNeverReplays(t *testing.T) {

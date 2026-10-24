@@ -26,6 +26,9 @@ type Shipper struct {
 	log        *slog.Logger
 	now        func() time.Time
 	sleep      func(context.Context, time.Duration) bool
+	// settled is called when a batch leaves the buffer for good: acked, or
+	// refused as permanently invalid. Log positions advance only here.
+	settled func(Pending)
 
 	skewMS atomic.Int64
 }
@@ -35,7 +38,7 @@ func NewShipper(c *http.Client, id Identity, buf *Buffer, log *slog.Logger) *Shi
 	return &Shipper{
 		client: c, endpoint: id.ServerURL + wire.PathBatch, credential: id.Credential,
 		buf: buf, backoff: NewBackoff(time.Second, 5*time.Minute), log: log,
-		now: time.Now, sleep: sleepCtx,
+		now: time.Now, sleep: sleepCtx, settled: func(Pending) {},
 	}
 }
 
@@ -86,10 +89,12 @@ func (s *Shipper) handle(ctx context.Context, p Pending) time.Duration {
 	switch classify(resp.Status) {
 	case Acked:
 		s.acked(p, resp.Body)
+		s.settled(p)
 		s.backoff.Reset()
 		return 0
 	case Dropped:
 		s.buf.Discard(p.Seq)
+		s.settled(p) // a refused batch is never resent: its lines must not be re-read forever
 		s.log.Error("server refused batch permanently; dropped", "seq", p.Seq,
 			"status", resp.Status, "reason", serverMessage(resp.Body))
 		return 0

@@ -9,6 +9,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/domain"
@@ -25,6 +26,12 @@ type Store struct {
 	limits   map[domain.TenantID]int
 	// nextSeries numbers series across the store, like an INTEGER PRIMARY KEY.
 	nextSeries int64
+	nextLog    int64
+	nextRule   int64
+	logLimits  map[domain.TenantID]int64
+	logUsage   map[usageKey]int64
+	rules      map[domain.TenantID][]domain.RedactionRule
+	now        func() time.Time
 }
 
 type token struct {
@@ -42,17 +49,22 @@ type host struct {
 	latest   *domain.CoreSample
 	series   map[string]*mseries // by metric|labels hash
 	snaps    map[int64]domain.ProcessSnapshot
+	logs     []logRow
 }
 
 // New returns an empty store.
 func New() *Store {
 	return &Store{
-		tenants:  map[domain.TenantID]domain.Tenant{},
-		tokens:   map[string]*token{},
-		hosts:    map[domain.HostID]*host{},
-		users:    map[domain.UserID]*user{},
-		sessions: map[string]*session{},
-		limits:   map[domain.TenantID]int{},
+		tenants:   map[domain.TenantID]domain.Tenant{},
+		tokens:    map[string]*token{},
+		hosts:     map[domain.HostID]*host{},
+		users:     map[domain.UserID]*user{},
+		sessions:  map[string]*session{},
+		limits:    map[domain.TenantID]int{},
+		logLimits: map[domain.TenantID]int64{},
+		logUsage:  map[usageKey]int64{},
+		rules:     map[domain.TenantID][]domain.RedactionRule{},
+		now:       time.Now,
 	}
 }
 

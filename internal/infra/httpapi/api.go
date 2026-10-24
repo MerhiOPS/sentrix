@@ -49,6 +49,20 @@ type DetailSeries interface {
 type Live interface {
 	Subscribe(tenant domain.TenantID, hosts []domain.HostID, since time.Time) *livehub.Sub
 	Unsubscribe(sub *livehub.Sub)
+	SubscribeLogs(tenant domain.TenantID, f livehub.LogFilter) *livehub.LogSub
+	UnsubscribeLogs(sub *livehub.LogSub)
+}
+
+// LogSearch answers log searches.
+type LogSearch interface {
+	Search(ctx context.Context, s domain.Scope, req query.LogSearchRequest) (query.LogPage, error)
+}
+
+// Rules manages a tenant's redaction rules.
+type Rules interface {
+	List(ctx context.Context, s domain.Scope) ([]domain.RedactionRule, error)
+	Create(ctx context.Context, s domain.Scope, r domain.RedactionRule) (domain.RedactionRule, error)
+	Delete(ctx context.Context, s domain.Scope, id int64) error
 }
 
 // Config is everything the API depends on.
@@ -60,6 +74,8 @@ type Config struct {
 	Series   Series
 	Details  DetailSeries
 	Procs    query.ProcessReader
+	Logs     LogSearch
+	Rules    Rules
 	Live     Live
 	// FormatToken renders an issued secret for the operator (adds the
 	// server's SPKI pin in self-signed mode).
@@ -89,6 +105,10 @@ func New(cfg Config) *API {
 	a.mux.HandleFunc("GET /api/v1/hosts/{id}/series/{sid}/metrics", a.requireSession(viewer, a.handleSeriesMetrics))
 	a.mux.HandleFunc("GET /api/v1/hosts/{id}/processes", a.requireSession(viewer, a.handleProcesses))
 	a.mux.HandleFunc("POST /api/v1/enrollment-tokens", a.requireOrigin(a.requireSession(admin, a.handleCreateToken)))
+	a.mux.HandleFunc("GET /api/v1/logs", a.requireSession(viewer, a.handleSearchLogs))
+	a.mux.HandleFunc("GET /api/v1/redaction-rules", a.requireSession(admin, a.handleListRules))
+	a.mux.HandleFunc("POST /api/v1/redaction-rules", a.requireOrigin(a.requireSession(admin, a.handleCreateRule)))
+	a.mux.HandleFunc("DELETE /api/v1/redaction-rules/{rid}", a.requireOrigin(a.requireSession(admin, a.handleDeleteRule)))
 	a.mux.HandleFunc("GET /api/v1/stream", a.requireSession(viewer, a.handleStream))
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, errorBody{Error: "not found"})

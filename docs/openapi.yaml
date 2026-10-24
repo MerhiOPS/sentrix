@@ -15,6 +15,10 @@ info:
     `{"type":"subscribe","hosts":["<id>",...]|null,"since_ms":<unix ms>}`;
     the server sends `CoreFrame` messages. Another tenant's host ids are
     silently ignored. A closed socket means "reconnect with since_ms".
+
+    Live tail uses the same endpoint: the client sends
+    `{"type":"tail","hosts":[...],"levels":[...],"q":"..."}` (filters as in
+    `GET /logs`, applied server-side) and receives `LogFrame` messages.
 servers:
   - url: /api/v1
 security:
@@ -177,6 +181,68 @@ paths:
               schema: { $ref: "#/components/schemas/ProcessSnapshot" }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /logs:
+    get:
+      operationId: searchLogs
+      description: |
+        Newest first. `q`: case-insensitive substring terms of at least 3
+        characters; whitespace is AND, an uppercase OR joins its neighbours,
+        "quoted phrases" are one term. Nothing in q is query syntax.
+      parameters:
+        - { name: hosts, in: query, required: false, description: Comma-separated host ids., schema: { type: string } }
+        - { name: levels, in: query, required: false, description: Comma-separated levels., schema: { type: string } }
+        - { name: q, in: query, required: false, schema: { type: string } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: cursor, in: query, required: false, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        "200":
+          description: One page of lines.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/LogPage" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+  /redaction-rules:
+    get:
+      operationId: listRedactionRules
+      responses:
+        "200":
+          description: The tenant's own rules (built-in rules are always on).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedactionRuleList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createRedactionRule
+      description: Admin only. RE2 pattern, applied to message, source and every label.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RedactionRuleInput" }
+      responses:
+        "201":
+          description: Created.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/RedactionRule" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /redaction-rules/{rid}:
+    delete:
+      operationId: deleteRedactionRule
+      parameters:
+        - { name: rid, in: path, required: true, schema: { type: integer, format: int64 } }
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
   /enrollment-tokens:
     post:
@@ -352,6 +418,71 @@ components:
       properties:
         token: { type: string }
         expires_at: { type: string, format: date-time }
+    LogEntry:
+      type: object
+      required: [id, host_id, ts, source, level, message, labels]
+      properties:
+        id: { type: integer, format: int64 }
+        host_id: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        source: { type: string }
+        level: { type: string, enum: [unknown, debug, info, warn, error, fatal] }
+        message: { type: string }
+        labels:
+          type: object
+          additionalProperties: { type: string }
+    LogPage:
+      type: object
+      required: [entries]
+      properties:
+        entries:
+          type: array
+          items: { $ref: "#/components/schemas/LogEntry" }
+        next_cursor: { type: string, nullable: true }
+    RedactionRuleInput:
+      type: object
+      required: [pattern, action]
+      properties:
+        pattern: { type: string }
+        replacement: { type: string }
+        action: { type: string, enum: [mask, drop] }
+    RedactionRule:
+      type: object
+      required: [id, pattern, replacement, action]
+      properties:
+        id: { type: integer, format: int64 }
+        pattern: { type: string }
+        replacement: { type: string }
+        action: { type: string, enum: [mask, drop] }
+    RedactionRuleList:
+      type: object
+      required: [rules]
+      properties:
+        rules:
+          type: array
+          items: { $ref: "#/components/schemas/RedactionRule" }
+    LogFrame:
+      description: WebSocket live-tail message from the server.
+      type: object
+      required: [type, host_id, lines]
+      properties:
+        type: { type: string, enum: [logs] }
+        host_id: { type: string, format: uuid }
+        lines:
+          type: array
+          items: { $ref: "#/components/schemas/LiveLogLine" }
+    LiveLogLine:
+      description: A line as it is stored; live lines carry no id.
+      type: object
+      required: [ts, source, level, message, labels]
+      properties:
+        ts: { type: string, format: date-time }
+        source: { type: string }
+        level: { type: string, enum: [unknown, debug, info, warn, error, fatal] }
+        message: { type: string }
+        labels:
+          type: object
+          additionalProperties: { type: string }
     CoreFrame:
       description: WebSocket message from the server.
       type: object

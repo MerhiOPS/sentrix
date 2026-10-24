@@ -19,6 +19,7 @@ type Batch struct {
 	Samples    []Sample   `json:"samples"`
 	Details    []Detail   `json:"details,omitempty"`   // Phase 3; absent from older agents
 	Processes  []Snapshot `json:"processes,omitempty"` // Phase 3
+	Logs       []LogLine  `json:"logs,omitempty"`      // Phase 4
 	Agent      AgentStats `json:"agent"`
 }
 
@@ -30,6 +31,16 @@ type Detail struct {
 	Kind   string            `json:"kind"`
 	Labels map[string]string `json:"labels"`
 	Value  float64           `json:"value"`
+}
+
+// LogLine is one log entry as read on the host. The server redacts it
+// before storage; the agent never needs to know the rules.
+type LogLine struct {
+	TSMS    int64             `json:"ts_ms"`
+	Source  string            `json:"source"`
+	Level   string            `json:"level"`
+	Message string            `json:"message"`
+	Labels  map[string]string `json:"labels,omitempty"`
 }
 
 // Snapshot is a top-N process list. Names only — never command lines.

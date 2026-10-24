@@ -12,6 +12,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
+	"github.com/MerhiOPS/sentrix/internal/app/redaction"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
@@ -30,6 +31,8 @@ var scopedPorts = []reflect.Type{
 	reflect.TypeFor[query.RollupReader](),
 	reflect.TypeFor[query.DetailReader](),
 	reflect.TypeFor[query.ProcessReader](),
+	reflect.TypeFor[query.LogReader](),
+	reflect.TypeFor[redaction.RuleRepo](),
 }
 
 // crossCase calls one method as tenant B against tenant A's data and returns
@@ -119,6 +122,9 @@ func CrossTenantProblems(ctx context.Context, t *testing.T, st Stores) []string 
 		}
 		if !ok {
 			c, ok = depthCrossCases[name]
+		}
+		if !ok {
+			c, ok = logCrossCases[name]
 		}
 		if !ok {
 			problems = append(problems, "no cross-tenant case for scoped method "+name)

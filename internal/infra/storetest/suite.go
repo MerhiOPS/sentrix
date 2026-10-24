@@ -32,6 +32,10 @@ func Run(t *testing.T, newStores Factory) {
 		"depth/series-ceiling":              testSeriesCeilingRefusesOnlyNewSeries,
 		"depth/series-cache-rollback":       testSeriesCreatedInRolledBackBatchIsNotCached,
 		"depth/processes-at":                testProcessesAtReturnsNewestNotAfter,
+		"logs/search-semantics":             testLogSearchSemantics,
+		"logs/pagination":                   testLogPaginationNewestFirstNoGapsNoDuplicates,
+		"logs/budget-in-transaction":        testLogBudgetReadInTransaction,
+		"logs/all-dropped-metered":          testAllDroppedBatchIsMetered,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

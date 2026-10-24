@@ -35,15 +35,16 @@ func TestBatcherSealsWithPersistedSeqAndStats(t *testing.T) {
 	now := time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)
 	seq, _ := OpenSeqSource(t.TempDir(), fixedClock(now))
 	b := NewBatcher(seq, 5*time.Second, zeroStats{})
-	if _, ok, _ := b.Seal(); ok {
+	if ps, _ := b.Seal(); len(ps) != 0 {
 		t.Fatal("empty batcher sealed a batch")
 	}
 	b.Add(domain.CoreSample{TS: now, CPUPercent: 3, NetRxBytes: 9})
 	b.Add(domain.CoreSample{TS: now.Add(5 * time.Second)})
-	p, ok, err := b.Seal()
-	if err != nil || !ok || p.Samples != 2 {
-		t.Fatalf("seal: %+v %v %v", p, ok, err)
+	ps, err := b.Seal()
+	if err != nil || len(ps) != 1 || ps[0].Samples != 2 {
+		t.Fatalf("seal: %+v %v", ps, err)
 	}
+	p := ps[0]
 	wb, err := gunzipBatch(p.Body)
 	if err != nil {
 		t.Fatal(err)
@@ -54,7 +55,7 @@ func TestBatcherSealsWithPersistedSeqAndStats(t *testing.T) {
 	if wb.Agent.BufferDepth != 3 || wb.Agent.DroppedTotal != 4 || wb.Agent.ClockSkewMS != 1500 {
 		t.Fatalf("agent stats = %+v", wb.Agent)
 	}
-	if _, ok, _ := b.Seal(); ok {
+	if ps, _ := b.Seal(); len(ps) != 0 {
 		t.Fatal("samples were sealed twice")
 	}
 }

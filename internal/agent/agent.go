@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/domain"
+	"github.com/MerhiOPS/sentrix/internal/infra/logtail"
 )
 
 // Config controls the agent loop.
@@ -45,7 +46,11 @@ type Sources struct {
 	Core   Collector
 	Detail DetailCollector
 	Procs  ProcessCollector
+	Logs   []logtail.Source
 }
+
+// logPollEvery is how often log sources are read.
+const logPollEvery = time.Second
 
 // Agent runs collection and shipping.
 type Agent struct {
@@ -54,6 +59,7 @@ type Agent struct {
 	batcher *Batcher
 	buf     *Buffer
 	ship    *Shipper
+	logSrc  map[string]logtail.Source
 	log     *slog.Logger
 }
 
@@ -73,6 +79,14 @@ func New(cfg Config, id Identity, src Sources, log *slog.Logger) (*Agent, error)
 	}
 	a := &Agent{cfg: cfg, src: src, buf: NewBuffer(cfg.BufferMax), log: log}
 	a.ship = NewShipper(client, id, a.buf, log)
+	a.logSrc = map[string]logtail.Source{}
+	for _, s := range src.Logs {
+		a.logSrc[s.Name()] = s
+	}
+	if err := restorePositions(cfg.StateDir, src.Logs); err != nil {
+		return nil, err
+	}
+	a.ship.settled = a.settle
 	a.batcher = NewBatcher(seq, cfg.Interval, a)
 	return a, nil
 }
@@ -92,6 +106,8 @@ func (a *Agent) Run(ctx context.Context) {
 	sample := time.NewTicker(a.cfg.Interval)
 	seal := time.NewTicker(a.cfg.BatchEvery)
 	procs := time.NewTicker(max(a.cfg.ProcessEvery, time.Second))
+	logs := time.NewTicker(logPollEvery)
+	defer logs.Stop()
 	defer sample.Stop()
 	defer seal.Stop()
 	defer procs.Stop()
@@ -107,6 +123,8 @@ func (a *Agent) Run(ctx context.Context) {
 			a.collect(ctx)
 		case <-procs.C:
 			a.snapshot(ctx)
+		case <-logs.C:
+			a.pollLogs(ctx)
 		case <-seal.C:
 			a.seal()
 		}
@@ -151,13 +169,35 @@ func (a *Agent) snapshot(ctx context.Context) {
 }
 
 func (a *Agent) seal() {
-	p, ok, err := a.batcher.Seal()
+	ps, err := a.batcher.Seal()
 	if err != nil {
 		a.log.Error("seal batch", "err", err)
 		return
 	}
-	if ok {
+	for _, p := range ps {
 		a.buf.Push(p)
+	}
+}
+
+func (a *Agent) pollLogs(ctx context.Context) {
+	for name, src := range a.logSrc {
+		lines, mark, err := src.Poll(ctx)
+		if err != nil {
+			a.log.Debug("log source", "source", name, "err", err)
+		}
+		if len(lines) > 0 || mark != nil {
+			a.batcher.AddLogs(name, lines, mark)
+		}
+	}
+}
+
+// settle commits the log positions of a batch that left the buffer for good.
+func (a *Agent) settle(p Pending) {
+	if len(p.Marks) == 0 {
+		return
+	}
+	if err := commitPositions(a.cfg.StateDir, a.logSrc, p.Marks); err != nil {
+		a.log.Warn("persist log positions", "err", err) // retried with the next settled batch
 	}
 }
 

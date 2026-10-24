@@ -18,8 +18,8 @@ func coreAt(sec int, cpu float64, rx uint64) domain.CoreSample {
 }
 
 func withSamples(at time.Time, ss ...domain.CoreSample) ingest.BuildFunc {
-	return func(state ingest.CounterState) (ingest.Prepared, error) {
-		return ingest.Prepared{Samples: ss, Counters: state, Interval: 5 * time.Second, ReceivedAt: at,
+	return func(state ingest.TxState) (ingest.Prepared, error) {
+		return ingest.Prepared{Samples: ss, Counters: state.Counters, Interval: 5 * time.Second, ReceivedAt: at,
 			SeqRetention: ingest.DefaultWindow.SeqRetention()}, nil
 	}
 }
@@ -88,8 +88,8 @@ func detail(sec int, metric string, kind domain.MetricKind, labels domain.Labels
 }
 
 func withDetails(seqRetention time.Duration, ds ...domain.DetailSample) ingest.BuildFunc {
-	return func(state ingest.CounterState) (ingest.Prepared, error) {
-		return ingest.Prepared{Details: ds, Counters: state, Interval: 5 * time.Second, ReceivedAt: T0, SeqRetention: seqRetention}, nil
+	return func(state ingest.TxState) (ingest.Prepared, error) {
+		return ingest.Prepared{Details: ds, Counters: state.Counters, Interval: 5 * time.Second, ReceivedAt: T0, SeqRetention: seqRetention}, nil
 	}
 }
 
@@ -165,8 +165,8 @@ func testProcessesAtReturnsNewestNotAfter(t *testing.T, st Stores) {
 	snap := func(sec int, name string) domain.ProcessSnapshot {
 		return domain.ProcessSnapshot{TS: T0.Add(time.Duration(sec) * time.Second), Procs: []domain.Process{{Name: name, CPUPercent: 1.234, RSS: 42}}}
 	}
-	commit(t, st, f, 1, func(s ingest.CounterState) (ingest.Prepared, error) {
-		return ingest.Prepared{Processes: []domain.ProcessSnapshot{snap(0, "a"), snap(30, "b")}, Counters: s,
+	commit(t, st, f, 1, func(s ingest.TxState) (ingest.Prepared, error) {
+		return ingest.Prepared{Processes: []domain.ProcessSnapshot{snap(0, "a"), snap(30, "b")}, Counters: s.Counters,
 			Interval: 5 * time.Second, ReceivedAt: T0, SeqRetention: ingest.DefaultWindow.SeqRetention()}, nil
 	})
 	ctx := context.Background()

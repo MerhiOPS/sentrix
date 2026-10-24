@@ -40,6 +40,8 @@ type Prepared struct {
 	Samples    []domain.CoreSample // sorted by TS, snapped, counters reset-adjusted
 	Details    []domain.DetailSample
 	Processes  []domain.ProcessSnapshot
+	Logs       []domain.LogLine // redacted, within today's budget
+	LogStats   LogStats
 	Counters   CounterState // state after this batch (core and detail counters)
 	Rejected   int          // samples refused individually
 	Interval   time.Duration
@@ -51,10 +53,32 @@ type Prepared struct {
 	SeqRetention time.Duration
 }
 
-// BuildFunc computes a Prepared from the stored counter state. A store calls
+// TxState is what the store reads inside the write transaction for build:
+// the host's counter state and the tenant's log budget left today. Reading
+// both in the transaction that commits the result is what keeps counters
+// and the log quota exact under concurrency and replay (R1; OLD C-M1).
+type TxState struct {
+	Counters CounterState
+	// LogBudget is bytes the tenant may still store today; negative means
+	// over budget already.
+	LogBudget int64
+}
+
+// LogStats are the per-batch log counts the store meters with the batch —
+// including for a batch where every line was dropped or shed (OLD C-M11).
+type LogStats struct {
+	Received   int
+	Redacted   int
+	Dropped    int    // by a drop rule
+	Shed       int    // refused: quota or disk
+	ShedReason string // "quota" | "disk"
+	Bytes      int64  // billable bytes of the stored lines
+}
+
+// BuildFunc computes a Prepared from the transaction's state. A store calls
 // it at most once per CommitBatch, inside the write transaction, and never
 // for a replayed batch.
-type BuildFunc func(state CounterState) (Prepared, error)
+type BuildFunc func(state TxState) (Prepared, error)
 
 // CommitResult reports what a CommitBatch did.
 type CommitResult struct {
@@ -67,6 +91,7 @@ type CommitResult struct {
 	// created a series past the tenant's ceiling. Existing series are never
 	// refused, and hitting the ceiling never fails the batch (OLD A-C1).
 	SeriesRefused int
+	LogsStored    int
 }
 
 // Publisher receives samples after they are durably stored — never before
@@ -74,6 +99,19 @@ type CommitResult struct {
 // not block: the ingest path waits on it.
 type Publisher interface {
 	PublishCore(tenant domain.TenantID, host domain.HostID, samples []domain.CoreSample)
+	PublishLogs(tenant domain.TenantID, host domain.HostID, lines []domain.LogLine)
+}
+
+// Redactor removes secrets from log lines before storage. It returns the
+// lines to keep, how many it changed, and how many drop rules removed.
+type Redactor interface {
+	Redact(ctx context.Context, s domain.Scope, lines []domain.LogLine) ([]domain.LogLine, int, int, error)
+}
+
+// DiskGuard reports whether the data directory has room for logs. Below the
+// watermark logs are shed and metrics keep flowing.
+type DiskGuard interface {
+	LogsAllowed() bool
 }
 
 // Store persists a batch as one unit of work: raw rows, latest values,

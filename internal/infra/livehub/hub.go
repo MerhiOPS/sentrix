@@ -30,15 +30,18 @@ type hostKey struct {
 
 // Hub fans stored samples out to subscribers of the same tenant.
 type Hub struct {
-	mu    sync.RWMutex
-	subs  map[*Sub]struct{}
-	rings map[hostKey]*ring
+	mu      sync.RWMutex
+	subs    map[*Sub]struct{}
+	logSubs map[*LogSub]struct{}
+	rings   map[hostKey]*ring
 
 	slowDropped atomic.Uint64
 }
 
 // New returns an empty hub.
-func New() *Hub { return &Hub{subs: map[*Sub]struct{}{}, rings: map[hostKey]*ring{}} }
+func New() *Hub {
+	return &Hub{subs: map[*Sub]struct{}{}, logSubs: map[*LogSub]struct{}{}, rings: map[hostKey]*ring{}}
+}
 
 // PublishCore implements ingest.Publisher. It never blocks: a subscriber
 // whose buffer is full is closed and counted, so one slow browser cannot

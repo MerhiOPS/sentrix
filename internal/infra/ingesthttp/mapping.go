@@ -45,6 +45,12 @@ func toBatch(b wire.Batch) ingest.Batch {
 		}
 		out.Processes = append(out.Processes, snap)
 	}
+	for _, l := range b.Logs {
+		out.Logs = append(out.Logs, domain.LogLine{
+			TS: time.UnixMilli(l.TSMS).UTC(), Source: l.Source, Level: domain.ParseLevel(l.Level),
+			Message: l.Message, Labels: domain.Labels(l.Labels),
+		})
+	}
 	return out
 }
 
@@ -52,6 +58,7 @@ func toAck(seq uint64, r ingest.Result) wire.Ack {
 	return wire.Ack{
 		BatchSeq: seq, ServerTSMS: r.ServerNow.UnixMilli(),
 		Replayed: r.Replayed, Rejected: r.Rejected,
+		LogsShed: r.LogsShed, LogsShedReason: r.LogsShedReason,
 	}
 }
 

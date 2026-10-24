@@ -50,7 +50,7 @@ func testReplayAppliesNothing(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
 	commit(t, st, f, 7, prepared(T0, []int{0}, []uint64{1}))
 	called := false
-	r := commit(t, st, f, 7, func(s ingest.CounterState) (ingest.Prepared, error) {
+	r := commit(t, st, f, 7, func(s ingest.TxState) (ingest.Prepared, error) {
 		called = true
 		return prepared(T0, []int{1, 2}, []uint64{2, 3})(s)
 	})
@@ -78,7 +78,7 @@ func testConflictsCounted(t *testing.T, st Stores) {
 // retry of the same seq is applied, not acked as a replay.
 func testBuildErrorRollsBack(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
-	_, err := st.CommitBatch(context.Background(), f.scope, f.host, 5, func(ingest.CounterState) (ingest.Prepared, error) {
+	_, err := st.CommitBatch(context.Background(), f.scope, f.host, 5, func(ingest.TxState) (ingest.Prepared, error) {
 		return ingest.Prepared{}, errors.New("boom")
 	})
 	if err == nil {
@@ -92,14 +92,14 @@ func testBuildErrorRollsBack(t *testing.T, st Stores) {
 
 func testCounterStatePersists(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
-	commit(t, st, f, 1, func(s ingest.CounterState) (ingest.Prepared, error) {
+	commit(t, st, f, 1, func(s ingest.TxState) (ingest.Prepared, error) {
 		p, err := prepared(T0, []int{0}, []uint64{1})(s)
 		p.Counters = ingest.CounterState{ingest.NetRx: {LastRaw: 500, Offset: 1234}}
 		return p, err
 	})
 	var seen ingest.CounterState
-	commit(t, st, f, 2, func(s ingest.CounterState) (ingest.Prepared, error) {
-		seen = s
+	commit(t, st, f, 2, func(s ingest.TxState) (ingest.Prepared, error) {
+		seen = s.Counters
 		return prepared(T0, []int{1}, []uint64{2})(s)
 	})
 	if got := seen[ingest.NetRx]; got.LastRaw != 500 || got.Offset != 1234 {
@@ -139,7 +139,7 @@ func testLastSeenUpdated(t *testing.T, st Stores) {
 func testHealthPersisted(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
 	report := func(rejected int, conflictsOf []int) ingest.BuildFunc {
-		return func(s ingest.CounterState) (ingest.Prepared, error) {
+		return func(s ingest.TxState) (ingest.Prepared, error) {
 			p, err := prepared(T0, conflictsOf, make([]uint64, len(conflictsOf)))(s)
 			p.Rejected = rejected
 			p.Agent = ingest.AgentStats{Version: "1.2.3", BufferDepth: 4, DroppedTotal: 5, ClockSkew: 1500 * time.Millisecond}

@@ -63,3 +63,22 @@ func (s *Store) SetSeriesLimit(ctx context.Context, ops domain.OpsScope, t domai
 	}
 	return nil
 }
+
+// SetLogLimit implements identity.TenantRepo.
+func (s *Store) SetLogLimit(ctx context.Context, ops domain.OpsScope, t domain.TenantID, bytes int64) error {
+	if _, err := ops.Reason(); err != nil {
+		return err
+	}
+	if bytes < 0 {
+		return fmt.Errorf("%w: log limit must be >= 0", domain.ErrInvalid)
+	}
+	res, err := s.db.Writer().ExecContext(ctx, `UPDATE tenants SET log_bytes_per_day = ? WHERE id = ?`,
+		bytes, encID(domain.ID(t)))
+	if err != nil {
+		return fmt.Errorf("set log limit: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("tenant: %w", domain.ErrNotFound)
+	}
+	return nil
+}

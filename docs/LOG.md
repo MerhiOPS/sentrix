@@ -5,6 +5,84 @@ why. Newest first.
 
 ---
 
+## Phase 4 — Logs · 2026-10-24
+
+**Landed**
+- Agent sources: files (glob allowlist, identity by inode / Windows file
+  index, retained handle drained across rotation, `FILE_SHARE_DELETE`,
+  truncation, multi-line join, first run tails from the end), journald
+  (`journalctl -o json`, persisted cursor, byte-array messages), Windows
+  Event Log (`wevtutil`, per-channel EventRecordID).
+- Positions are committed only when the batch holding the lines **settles**
+  (acked, or refused as permanently invalid) and persisted atomically —
+  at-least-once, never lost (R1). Logs split into batch-sized chunks; the
+  marks ride in the last chunk.
+- Server redaction before storage and before the index: bearer/basic tokens,
+  Authorization headers, URL credentials, key=value secrets, emails, IPv4,
+  IPv6 (regex candidates confirmed by `net.ParseIP`, so times and MACs are
+  untouched — OLD C-M10) — on message, source **and every label** (OLD A-C2).
+  Tenant RE2 rules (mask/drop, capped), cache invalidated on change.
+- Quota: `BuildFunc` now receives `TxState` — counters **and** the tenant's
+  remaining log budget, both read in the batch transaction; usage written in
+  the same commit, including for fully dropped batches (OLD C-M1, C-M11).
+  Over quota or below the 20 % disk watermark: logs shed with a reason,
+  metrics stored. No redactor configured: logs shed, never stored raw, and
+  the batch never fails.
+- Search: FTS5 trigram, case-insensitive substring terms ≥ 3 chars, AND / OR
+  / phrases, every term double-quoted (FTS syntax in input is literal text),
+  newest-first keyset paging, validated opaque cursors (OLD B9). Live tail on
+  the stream WebSocket with server-side filters (OLD B10).
+- Dashboard: Logs page with host, level, text and range filters, live mode,
+  load-older paging, chart click → ±5 min around that moment; admin
+  redaction-rules panel.
+
+**Acceptance**
+- rename-rotation loses zero lines and re-ships none — `TestRenameRotationLosesNothingShipsNothingTwice`
+  (rotated name inside and outside the globs) ✅; copytruncate best effort, documented in code
+- secret in a label and in `source` redacted on the **stored** row — `TestSecretsRedactedOnTheStoredRow`,
+  `TestEveryFieldIsRedacted`; manual run: 0 raw secrets in the logs table ✅
+- FTS operator syntax searched literally — `logs/search-semantics`, `TestFTSSyntaxIsSearchedLiterally` ✅
+- over-quota tenant still ingests metrics — `TestOverQuotaShedsLogsKeepsMetrics`, `TestOverQuotaTenantStillIngestsMetrics` ✅
+- tenant A cannot find tenant B's lines — `LogReader.SearchLogs` cross-tenant case, `TestTenantCannotSearchAnotherTenantsLogs` ✅
+- search latency over 1M lines measured (below) ✅
+
+**Measured** — 1 000 000 lines, 10 hosts, one tenant, stored through `CommitBatch`
+
+| | result |
+|---|---|
+| ingest | 18 350 lines/s (2 000 lines per batch) |
+| size | 278 B/line including the trigram index (265 MiB) |
+| newest page, no text | 0.25 ms |
+| common term | 58 ms · one host 70 ms |
+| two terms AND | 75 ms · phrase 92 ms |
+| rare term (10 hits) | 110 ms · OR 125 ms |
+
+`go test ./internal/infra/sqlite -run '^$' -bench LogSearch -benchtime 20x`.
+The rare term being among the slowest is a plan effect (the logs table is
+walked newest-first and each row checked against the match set). An
+FTS-driven join was tried to fix it and was **catastrophically slower** — the
+first search had not finished after 50 minutes — so it was reverted, and
+every benchmark search now has a 10 s budget so a bad plan fails fast.
+Improving rare-term latency is open (e.g. choosing the plan by the match
+count).
+
+**Caught before shipping**
+- A rotation scheme whose rotated name also matches the globs would have
+  re-read the whole rotated file — files are now matched by identity.
+- A partial line inside a committed mark would have been skipped after a
+  restart — the mark excludes held partial lines (a test added after a
+  mutation survived).
+- Redactor missing would have failed batches with 403 (agent stops all
+  shipping) — now logs are shed and metrics flow.
+- A stat error other than "not exists" was silently skipped forever — now
+  surfaced.
+
+**Deferred**
+- Windows Event Log is compiled, unit-tested on fixtures and vetted for
+  Windows, but has not run on a Windows host yet (OLD C-M13 still unproven).
+
+---
+
 ## Phase 3 — Depth · 2026-10-24
 
 **Landed**

@@ -148,6 +148,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Newest first. `q`: case-insensitive substring terms of at least 3
+         *     characters; whitespace is AND, an uppercase OR joins its neighbours,
+         *     "quoted phrases" are one term. Nothing in q is query syntax.
+         */
+        get: operations["searchLogs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/redaction-rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listRedactionRules"];
+        put?: never;
+        /** @description Admin only. RE2 pattern, applied to message, source and every label. */
+        post: operations["createRedactionRule"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/redaction-rules/{rid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["deleteRedactionRule"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/enrollment-tokens": {
         parameters: {
             query?: never;
@@ -297,6 +351,62 @@ export interface components {
             token: string;
             /** Format: date-time */
             expires_at: string;
+        };
+        LogEntry: {
+            /** Format: int64 */
+            id: number;
+            /** Format: uuid */
+            host_id: string;
+            /** Format: date-time */
+            ts: string;
+            source: string;
+            /** @enum {string} */
+            level: "unknown" | "debug" | "info" | "warn" | "error" | "fatal";
+            message: string;
+            labels: {
+                [key: string]: string;
+            };
+        };
+        LogPage: {
+            entries: components["schemas"]["LogEntry"][];
+            next_cursor?: string | null;
+        };
+        RedactionRuleInput: {
+            pattern: string;
+            replacement?: string;
+            /** @enum {string} */
+            action: "mask" | "drop";
+        };
+        RedactionRule: {
+            /** Format: int64 */
+            id: number;
+            pattern: string;
+            replacement: string;
+            /** @enum {string} */
+            action: "mask" | "drop";
+        };
+        RedactionRuleList: {
+            rules: components["schemas"]["RedactionRule"][];
+        };
+        /** @description WebSocket live-tail message from the server. */
+        LogFrame: {
+            /** @enum {string} */
+            type: "logs";
+            /** Format: uuid */
+            host_id: string;
+            lines: components["schemas"]["LiveLogLine"][];
+        };
+        /** @description A line as it is stored; live lines carry no id. */
+        LiveLogLine: {
+            /** Format: date-time */
+            ts: string;
+            source: string;
+            /** @enum {string} */
+            level: "unknown" | "debug" | "info" | "warn" | "error" | "fatal";
+            message: string;
+            labels: {
+                [key: string]: string;
+            };
         };
         /** @description WebSocket message from the server. */
         CoreFrame: {
@@ -559,6 +669,111 @@ export interface operations {
             };
             400: components["responses"]["Error"];
             401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    searchLogs: {
+        parameters: {
+            query: {
+                /** @description Comma-separated host ids. */
+                hosts?: string;
+                /** @description Comma-separated levels. */
+                levels?: string;
+                q?: string;
+                from: string;
+                to: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of lines. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LogPage"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+        };
+    };
+    listRedactionRules: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's own rules (built-in rules are always on). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedactionRuleList"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+        };
+    };
+    createRedactionRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedactionRuleInput"];
+            };
+        };
+        responses: {
+            /** @description Created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedactionRule"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    deleteRedactionRule: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                rid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
             404: components["responses"]["Error"];
         };
     };

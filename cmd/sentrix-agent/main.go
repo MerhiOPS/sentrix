@@ -2,7 +2,7 @@
 // server.
 //
 //	sentrix-agent enroll --server https://HOST:8443 --token TOKEN [--state-dir DIR]
-//	sentrix-agent run    [--state-dir DIR] [--interval 5s]
+//	sentrix-agent run    [--state-dir DIR] [--interval 5s] [--log-file GLOB]... [--journald] [--eventlog CHANNELS]
 //	sentrix-agent version
 package main
 
@@ -74,7 +74,13 @@ func runAgent(args []string) error {
 	dir := fs.String("state-dir", defaultStateDir, "state directory")
 	interval := fs.Duration("interval", 5*time.Second, "sampling interval")
 	debug := fs.Bool("debug", false, "log collector errors")
+	var lf logFlags
+	lf.register(fs)
 	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	logSources, err := lf.sources()
+	if err != nil {
 		return err
 	}
 	if err := domain.ValidateInterval(*interval); err != nil {
@@ -93,7 +99,7 @@ func runAgent(args []string) error {
 	cfg.Interval = *interval
 	cfg.BatchEvery = max(2**interval, 10*time.Second)
 	a, err := agent.New(cfg, id, agent.Sources{
-		Core: collector.NewCore(), Detail: collector.NewDetail(), Procs: collector.NewProcesses(),
+		Core: collector.NewCore(), Detail: collector.NewDetail(), Procs: collector.NewProcesses(), Logs: logSources,
 	}, log)
 	if err != nil {
 		return err

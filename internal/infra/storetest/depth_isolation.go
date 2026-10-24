@@ -62,9 +62,9 @@ var depthCrossCases = map[string]crossCase{
 		return ""
 	},
 	"ProcessReader.ProcessesAt": func(ctx context.Context, st Stores, a, b fixture) string {
-		_, err := st.CommitBatch(ctx, a.scope, a.host, 503, func(s ingest.CounterState) (ingest.Prepared, error) {
+		_, err := st.CommitBatch(ctx, a.scope, a.host, 503, func(s ingest.TxState) (ingest.Prepared, error) {
 			return ingest.Prepared{Processes: []domain.ProcessSnapshot{{TS: T0, Procs: []domain.Process{{Name: "secret-daemon"}}}},
-				Counters: s, Interval: 5 * time.Second, ReceivedAt: T0, SeqRetention: ingest.DefaultWindow.SeqRetention()}, nil
+				Counters: s.Counters, Interval: 5 * time.Second, ReceivedAt: T0, SeqRetention: ingest.DefaultWindow.SeqRetention()}, nil
 		})
 		if err != nil {
 			return err.Error()

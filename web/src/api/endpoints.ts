@@ -30,3 +30,28 @@ export const listSeries = (id: string) => api<SeriesList>("GET", `/hosts/${id}/s
 export const seriesMetrics = (id: string, sid: number, from: string, to: string) =>
   api<DetailFrame>("GET", `/hosts/${id}/series/${sid}/metrics` + q({ from, to }));
 export const hostProcesses = (id: string) => api<ProcessSnapshot>("GET", `/hosts/${id}/processes`);
+
+export type LogPage = S["LogPage"];
+export type LogEntry = S["LogEntry"];
+export type LiveLogLine = S["LiveLogLine"];
+export type LogFrame = S["LogFrame"];
+export type RedactionRule = S["RedactionRule"];
+export type RedactionRuleInput = S["RedactionRuleInput"];
+
+export interface LogFilter {
+  hosts: string[];
+  levels: string[];
+  q: string;
+  from: string;
+  to: string;
+}
+
+export const searchLogs = (f: LogFilter, cursor?: string) =>
+  api<LogPage>("GET", "/logs" + q({
+    hosts: f.hosts.length ? f.hosts.join(",") : undefined,
+    levels: f.levels.length ? f.levels.join(",") : undefined,
+    q: f.q || undefined, from: f.from, to: f.to, cursor, limit: "100",
+  }));
+export const listRules = () => api<S["RedactionRuleList"]>("GET", "/redaction-rules");
+export const createRule = (r: RedactionRuleInput) => api<RedactionRule>("POST", "/redaction-rules", r);
+export const deleteRule = (id: number) => api<void>("DELETE", `/redaction-rules/${id}`);

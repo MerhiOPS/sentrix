@@ -18,10 +18,12 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
+	"github.com/MerhiOPS/sentrix/internal/app/redaction"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 	"github.com/MerhiOPS/sentrix/internal/infra/livehub"
 	"github.com/MerhiOPS/sentrix/internal/infra/memstore"
 	"github.com/MerhiOPS/sentrix/internal/infra/password"
+	"github.com/MerhiOPS/sentrix/internal/infra/redact"
 )
 
 const testOrigin = "http://sentrix.test"
@@ -36,12 +38,13 @@ type tenantRig struct {
 }
 
 type rig struct {
-	store  *memstore.Store
-	hub    *livehub.Hub
-	ingest *ingest.Service
-	srv    *httptest.Server
-	router routers.Router
-	a, b   tenantRig
+	store    *memstore.Store
+	hub      *livehub.Hub
+	ingest   *ingest.Service
+	srv      *httptest.Server
+	redactor *redact.Redactor
+	router   routers.Router
+	a, b     tenantRig
 }
 
 const testPassword = "correct horse battery staple"
@@ -58,11 +61,14 @@ func newRig(t *testing.T) *rig {
 	r := &rig{store: st, hub: livehub.New()}
 	r.ingest = ingest.NewService(st, ingest.DefaultWindow, time.Now)
 	r.ingest.SetPublisher(r.hub)
+	r.redactor = redact.New(st, time.Minute, time.Now)
+	r.ingest.SetLogPipeline(r.redactor, nil)
 	r.a = seedTenant(t, st, hasher, "a")
 	r.b = seedTenant(t, st, hasher, "b")
 	api := New(Config{
 		Sessions: sessions, Users: st, Tokens: identity.NewEnrollment(st, time.Now),
 		Hosts: st, Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: r.hub,
+		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, r.redactor),
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})
 	r.srv = httptest.NewServer(api)
