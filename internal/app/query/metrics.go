@@ -3,7 +3,6 @@ package query
 import (
 	"context"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/domain"
@@ -14,7 +13,7 @@ import (
 // did not ask for (OLD B1/B8) — the caller passes a coarser step.
 const MaxPoints = 2000
 
-// Gauge names a core gauge that can be charted.
+// Gauge names a chartable core metric: a gauge, or a counter's rate.
 type Gauge string
 
 const (
@@ -37,37 +36,39 @@ var gaugeValue = map[Gauge]func(domain.CoreSample) float64{
 	GaugeMemUsed: func(s domain.CoreSample) float64 { return float64(s.MemoryUsed) },
 }
 
-// SeriesRequest asks for gauges of one host over [From, To).
+// SeriesRequest asks for core metrics of one host over [From, To).
 type SeriesRequest struct {
 	Host   domain.HostID
 	Gauges []Gauge
 	From   time.Time
 	To     time.Time
-	Step   time.Duration // zero = the host's own sampling interval
+	Step   time.Duration // zero = automatic (TargetPoints)
 }
 
-// Frame is columnar: one timestamp axis, one value column per gauge. A NaN
-// value is a bucket with no data; the transport renders it as null, so a
-// chart draws a gap instead of a fake zero (OLD B13).
+// Frame is columnar: one timestamp axis, one value column per metric. NaN
+// is a bucket without data; the transport renders it as null, so a chart
+// draws a gap instead of a fake zero (OLD B13).
 type Frame struct {
 	From, To time.Time
 	Step     time.Duration
+	Source   Source
 	TS       []time.Time
 	Series   map[Gauge][]float64
 }
 
 // Metrics answers chart queries.
 type Metrics struct {
-	hosts HostReader
-	core  CoreReader
+	hosts   HostReader
+	core    CoreReader
+	rollups RollupReader
 }
 
 // NewMetrics builds the use case.
-func NewMetrics(hosts HostReader, core CoreReader) *Metrics {
-	return &Metrics{hosts: hosts, core: core}
+func NewMetrics(hosts HostReader, core CoreReader, rollups RollupReader) *Metrics {
+	return &Metrics{hosts: hosts, core: core, rollups: rollups}
 }
 
-// Series returns one Frame. Each bucket holds the mean of the samples in it.
+// Series returns one Frame from raw samples or rollups, whichever plan picks.
 func (m *Metrics) Series(ctx context.Context, s domain.Scope, req SeriesRequest) (Frame, error) {
 	if err := validate(req); err != nil {
 		return Frame{}, err
@@ -76,19 +77,31 @@ func (m *Metrics) Series(ctx context.Context, s domain.Scope, req SeriesRequest)
 	if err != nil {
 		return Frame{}, err
 	}
-	step := req.Step
-	if step == 0 {
-		step = max(h.Interval, domain.MinInterval)
-	}
-	n := int(math.Ceil(float64(req.To.Sub(req.From)) / float64(step)))
-	if n > MaxPoints {
-		return Frame{}, fmt.Errorf("%w: %d points requested, max %d — use a coarser step", domain.ErrInvalid, n, MaxPoints)
-	}
-	samples, err := m.core.RawCore(ctx, s, req.Host, req.From, req.To)
+	step, source, err := plan(req, max(h.Interval, domain.MinInterval))
 	if err != nil {
 		return Frame{}, err
 	}
-	return bucket(req, step, n, samples), nil
+	f := newFrame(req, step, source)
+	if source == SourceRaw {
+		samples, err := m.core.RawCore(ctx, s, req.Host, req.From, req.To)
+		if err != nil {
+			return Frame{}, err
+		}
+		fillFromRaw(&f, req.Gauges, samples)
+		return f, nil
+	}
+	res := Res1m
+	if source == Source1h {
+		res = Res1h
+	}
+	// Buckets are keyed by start; widen the read so a bucket starting before
+	// From that ends inside it is still found, then filter in fillFromRollups.
+	buckets, err := m.rollups.Rollups(ctx, s, req.Host, res, req.From.Truncate(res.Width()), req.To)
+	if err != nil {
+		return Frame{}, err
+	}
+	fillFromRollups(&f, req.Gauges, buckets)
+	return f, nil
 }
 
 func validate(req SeriesRequest) error {
@@ -99,47 +112,12 @@ func validate(req SeriesRequest) error {
 		return fmt.Errorf("%w: step must be at least %v", domain.ErrInvalid, domain.MinInterval)
 	}
 	if len(req.Gauges) == 0 {
-		return fmt.Errorf("%w: no gauges requested", domain.ErrInvalid)
+		return fmt.Errorf("%w: no metrics requested", domain.ErrInvalid)
 	}
 	for _, g := range req.Gauges {
-		if _, ok := gaugeValue[g]; !ok {
-			return fmt.Errorf("%w: unknown gauge %q", domain.ErrInvalid, g)
+		if !isKnown(g) {
+			return fmt.Errorf("%w: unknown metric %q", domain.ErrInvalid, g)
 		}
 	}
 	return nil
-}
-
-// bucket averages samples into n buckets of width step starting at From.
-func bucket(req SeriesRequest, step time.Duration, n int, samples []domain.CoreSample) Frame {
-	f := Frame{From: req.From, To: req.To, Step: step, TS: make([]time.Time, n), Series: map[Gauge][]float64{}}
-	sums := map[Gauge][]float64{}
-	counts := make([]int, n)
-	for _, g := range req.Gauges {
-		sums[g] = make([]float64, n)
-	}
-	for i := range f.TS {
-		f.TS[i] = req.From.Add(time.Duration(i) * step)
-	}
-	for _, smp := range samples {
-		i := int(smp.TS.Sub(req.From) / step)
-		if i < 0 || i >= n {
-			continue
-		}
-		counts[i]++
-		for _, g := range req.Gauges {
-			sums[g][i] += gaugeValue[g](smp)
-		}
-	}
-	for _, g := range req.Gauges {
-		col := make([]float64, n)
-		for i := range col {
-			if counts[i] == 0 {
-				col[i] = math.NaN()
-			} else {
-				col[i] = sums[g][i] / float64(counts[i])
-			}
-		}
-		f.Series[g] = col
-	}
-	return f
 }

@@ -92,7 +92,7 @@ func TestAgentEnrollsWithPinAndShipsToSQLite(t *testing.T) {
 	}
 	cfg := agent.DefaultConfig(stateDir)
 	cfg.Interval, cfg.BatchEvery = time.Second, 2*time.Second
-	a, err := agent.New(cfg, id, &fakeCollector{}, slog.New(slog.DiscardHandler))
+	a, err := agent.New(cfg, id, agent.Sources{Core: &fakeCollector{}}, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

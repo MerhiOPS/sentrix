@@ -14,6 +14,8 @@ import (
 type TenantRepo interface {
 	CreateTenant(ctx context.Context, ops domain.OpsScope, t domain.Tenant) error
 	GetTenant(ctx context.Context, s domain.Scope) (domain.Tenant, error)
+	// SetSeriesLimit sets the tenant's detail-series ceiling (plans, Phase 7).
+	SetSeriesLimit(ctx context.Context, ops domain.OpsScope, t domain.TenantID, limit int) error
 }
 
 // EnrollmentToken is a stored token: only the hash of its secret is kept.

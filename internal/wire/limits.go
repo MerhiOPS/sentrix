@@ -15,6 +15,13 @@ const (
 	// interval this is over an hour of backlog in one request.
 	MaxSamplesPerBatch = 1000
 
+	// MaxDetailsPerBatch caps detail values per batch: ~30 series × 2
+	// samples is normal; this leaves room for a big host's backlog.
+	MaxDetailsPerBatch = 20000
+
+	// MaxSnapshotsPerBatch caps process snapshots per batch.
+	MaxSnapshotsPerBatch = 200
+
 	// MaxEnrollBytes caps the enrollment request.
 	MaxEnrollBytes = 16 << 10
 )

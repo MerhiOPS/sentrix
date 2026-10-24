@@ -100,6 +100,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/hosts/{id}/series": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["listSeries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hosts/{id}/series/{sid}/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["seriesMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/hosts/{id}/processes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["hostProcesses"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/enrollment-tokens": {
         parameters: {
             query?: never;
@@ -201,10 +249,49 @@ export interface components {
             /** Format: date-time */
             to: string;
             step_s: number;
+            /** @enum {string} */
+            source: "raw" | "1m" | "1h";
             ts_ms: number[];
             series: {
                 [key: string]: (number | null)[];
             };
+        };
+        Series: {
+            /** Format: int64 */
+            id: number;
+            metric: string;
+            /** @enum {string} */
+            kind: "gauge" | "counter";
+            /** @enum {string} */
+            unit: "percent" | "bytes";
+            labels: {
+                [key: string]: string;
+            };
+        };
+        SeriesList: {
+            series: components["schemas"]["Series"][];
+        };
+        DetailFrame: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            step_s: number;
+            /** @enum {string} */
+            kind: "gauge" | "counter";
+            ts_ms: number[];
+            values: (number | null)[];
+        };
+        Process: {
+            name: string;
+            cpu: number;
+            /** Format: int64 */
+            rss: number;
+        };
+        ProcessSnapshot: {
+            /** Format: date-time */
+            ts: string;
+            procs: components["schemas"]["Process"][];
         };
         EnrollmentToken: {
             token: string;
@@ -356,11 +443,19 @@ export interface operations {
     hostMetrics: {
         parameters: {
             query: {
-                /** @description Comma-separated gauge names. */
+                /**
+                 * @description Comma-separated metric names. Gauges: cpu, mem, disk, load1,
+                 *     load5, load15, mem_used. Rates (bytes/s, over the time the samples
+                 *     cover): net_rx_rate, net_tx_rate, disk_r_rate, disk_w_rate.
+                 */
                 gauges: string;
                 from: string;
                 to: string;
-                /** @description Bucket width in seconds; default is the host's interval. Requests over 2000 points are refused. */
+                /**
+                 * @description Bucket width in seconds. Default: automatic, about 300 points.
+                 *     Requests over 2000 points are refused. The data source (raw,
+                 *     1m or 1h rollups) follows the step and is reported in the frame.
+                 */
                 step?: number;
             };
             header?: never;
@@ -378,6 +473,88 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Frame"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listSeries: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["HostID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The host's detail series (per core, mount, device, NIC). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeriesList"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    seriesMetrics: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+                step?: number;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HostID"];
+                sid: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gauge means, or per-second rates for counters. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DetailFrame"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    hostProcesses: {
+        parameters: {
+            query?: {
+                /** @description Newest snapshot at or before this time; default now. */
+                at?: string;
+            };
+            header?: never;
+            path: {
+                id: components["parameters"]["HostID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Top processes by CPU and memory. Names only. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessSnapshot"];
                 };
             };
             400: components["responses"]["Error"];

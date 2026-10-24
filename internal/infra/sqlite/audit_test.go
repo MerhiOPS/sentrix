@@ -9,7 +9,7 @@ import (
 )
 
 // tenantTables are tables whose rows belong to one tenant.
-var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core|users|sessions)\b`)
+var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core|users|sessions|series|samples_detail|process_snapshots|rollup_core_1m|rollup_core_1h)\b`)
 
 // unscopedAllowed are the only statements that may touch tenant tables
 // without a tenant predicate, each because it is how the tenant is *found*.

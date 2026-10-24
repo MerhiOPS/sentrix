@@ -124,6 +124,9 @@ func (f *fakeTenants) CreateTenant(_ context.Context, ops domain.OpsScope, t dom
 func (f *fakeTenants) GetTenant(context.Context, domain.Scope) (domain.Tenant, error) {
 	return domain.Tenant{}, domain.ErrNotFound
 }
+func (f *fakeTenants) SetSeriesLimit(context.Context, domain.OpsScope, domain.TenantID, int) error {
+	return nil
+}
 
 func TestCreateTenant(t *testing.T) {
 	repo := &fakeTenants{}

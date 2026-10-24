@@ -62,8 +62,9 @@ func (h *Handler) handleBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, r, err)
 		return
 	}
-	if len(b.Samples) > wire.MaxSamplesPerBatch {
-		writeError(w, r, fmt.Errorf("%w: %d samples, max %d", errTooLarge, len(b.Samples), wire.MaxSamplesPerBatch))
+	if len(b.Samples) > wire.MaxSamplesPerBatch || len(b.Details) > wire.MaxDetailsPerBatch ||
+		len(b.Processes) > wire.MaxSnapshotsPerBatch {
+		writeError(w, r, fmt.Errorf("%w: batch over per-batch limits", errTooLarge))
 		return
 	}
 	res, err := h.ingest.Ingest(r.Context(), ah, toBatch(b))

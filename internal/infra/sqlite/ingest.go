@@ -43,7 +43,8 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	if err != nil {
 		return ingest.CommitResult{}, fmt.Errorf("build batch: %w", err)
 	}
-	res, err := writePrepared(ctx, tx, tk, hk, p)
+	sr := &seriesResolver{tx: tx, tk: tk, hk: hk, cache: &s.series, pending: map[seriesID]int64{}}
+	res, err := writePrepared(ctx, tx, tk, hk, p, sr)
 	if err != nil {
 		return ingest.CommitResult{}, err
 	}
@@ -53,6 +54,7 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	if err := tx.Commit(); err != nil {
 		return ingest.CommitResult{}, fmt.Errorf("commit batch: %w", err)
 	}
+	s.series.merge(sr.pending) // only now do new series exist for other batches
 	return res, nil
 }
 

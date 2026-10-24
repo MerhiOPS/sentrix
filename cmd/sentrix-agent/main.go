@@ -92,7 +92,9 @@ func runAgent(args []string) error {
 	cfg := agent.DefaultConfig(*dir)
 	cfg.Interval = *interval
 	cfg.BatchEvery = max(2**interval, 10*time.Second)
-	a, err := agent.New(cfg, id, collector.NewCore(), log)
+	a, err := agent.New(cfg, id, agent.Sources{
+		Core: collector.NewCore(), Detail: collector.NewDetail(), Procs: collector.NewProcesses(),
+	}, log)
 	if err != nil {
 		return err
 	}

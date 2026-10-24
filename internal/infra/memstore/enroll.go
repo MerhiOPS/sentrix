@@ -49,6 +49,7 @@ func (s *Store) RedeemToken(_ context.Context, secretHash []byte, now time.Time,
 	s.hosts[h.ID] = &host{
 		h: h, credHash: append([]byte(nil), nh.CredentialHash...),
 		seqs: map[uint64]int64{}, counters: ingest.CounterState{}, samples: map[int64]domain.CoreSample{},
+		series: map[string]*mseries{}, snaps: map[int64]domain.ProcessSnapshot{},
 	}
 	return h, nil
 }

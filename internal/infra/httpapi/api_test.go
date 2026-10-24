@@ -91,8 +91,13 @@ func TestMetricsPointCapAndNullGaps(t *testing.T) {
 		t.Fatalf("frame: %d %s (gaps must be null)", res.status, res.body)
 	}
 	day := span(now.Add(-24*time.Hour), now)
-	if res := r.call(t, "GET", base+day, c, ""); res.status != http.StatusBadRequest {
-		t.Fatalf("a day at natural resolution without step: %d, want 400", res.status)
+	// Without step the step is automatic (~300 points): bounded by
+	// construction, so it is served, never unbounded (OLD B8).
+	res = r.call(t, "GET", base+day, c, "")
+	var auto frameDTO
+	_ = json.Unmarshal(res.body, &auto)
+	if res.status != http.StatusOK || len(auto.TSMS) > 301 || auto.Source != "1m" {
+		t.Fatalf("a day without step: %d, %d points from %q; want ~300 from the 1m rollup", res.status, len(auto.TSMS), auto.Source)
 	}
 	if res := r.call(t, "GET", base+day+"&step=1", c, ""); res.status != http.StatusBadRequest {
 		t.Fatalf("a day at step=1: %d, want 400", res.status)

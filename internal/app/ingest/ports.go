@@ -38,8 +38,10 @@ type AgentStats struct {
 // (R1 by construction).
 type Prepared struct {
 	Samples    []domain.CoreSample // sorted by TS, snapped, counters reset-adjusted
-	Counters   CounterState        // state after this batch
-	Rejected   int                 // samples refused individually
+	Details    []domain.DetailSample
+	Processes  []domain.ProcessSnapshot
+	Counters   CounterState // state after this batch (core and detail counters)
+	Rejected   int          // samples refused individually
 	Interval   time.Duration
 	Agent      AgentStats
 	ReceivedAt time.Time
@@ -61,6 +63,10 @@ type CommitResult struct {
 	// Conflicts counts samples whose (host, ts) already existed: counted,
 	// never silently ignored (PLAN §4).
 	Conflicts int
+	// SeriesRefused counts detail samples dropped because they would have
+	// created a series past the tenant's ceiling. Existing series are never
+	// refused, and hitting the ceiling never fails the batch (OLD A-C1).
+	SeriesRefused int
 }
 
 // Publisher receives samples after they are durably stored — never before

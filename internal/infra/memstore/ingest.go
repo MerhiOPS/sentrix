@@ -38,6 +38,9 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 	if err := fitsStorage(p); err != nil {
 		return ingest.CommitResult{}, err
 	}
+	if err := fitsDetails(p); err != nil {
+		return ingest.CommitResult{}, err
+	}
 	// Commit point: every fallible step is behind us.
 	var res ingest.CommitResult
 	for _, smp := range p.Samples {
@@ -49,6 +52,8 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 		h.samples[k] = smp
 		res.Stored++
 	}
+	s.applyDetails(h, p.Details, &res)
+	s.applySnapshots(h, p.Processes, &res)
 	if n := len(p.Samples); n > 0 {
 		last := p.Samples[n-1]
 		if h.latest == nil || last.TS.After(h.latest.TS) {

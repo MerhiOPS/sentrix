@@ -39,6 +39,12 @@ type Series interface {
 	Series(ctx context.Context, s domain.Scope, req query.SeriesRequest) (query.Frame, error)
 }
 
+// DetailSeries answers per-core / per-mount / per-device / per-NIC charts.
+type DetailSeries interface {
+	Series(ctx context.Context, s domain.Scope, host domain.HostID) ([]domain.Series, error)
+	Frame(ctx context.Context, s domain.Scope, req query.DetailRequest) (query.DetailFrame, error)
+}
+
 // Live is the in-process feed.
 type Live interface {
 	Subscribe(tenant domain.TenantID, hosts []domain.HostID, since time.Time) *livehub.Sub
@@ -52,6 +58,8 @@ type Config struct {
 	Tokens   TokenIssuer
 	Hosts    Hosts
 	Series   Series
+	Details  DetailSeries
+	Procs    query.ProcessReader
 	Live     Live
 	// FormatToken renders an issued secret for the operator (adds the
 	// server's SPKI pin in self-signed mode).
@@ -77,6 +85,9 @@ func New(cfg Config) *API {
 	a.mux.HandleFunc("GET /api/v1/hosts", a.requireSession(viewer, a.handleListHosts))
 	a.mux.HandleFunc("GET /api/v1/hosts/{id}", a.requireSession(viewer, a.handleGetHost))
 	a.mux.HandleFunc("GET /api/v1/hosts/{id}/metrics", a.requireSession(viewer, a.handleMetrics))
+	a.mux.HandleFunc("GET /api/v1/hosts/{id}/series", a.requireSession(viewer, a.handleListSeries))
+	a.mux.HandleFunc("GET /api/v1/hosts/{id}/series/{sid}/metrics", a.requireSession(viewer, a.handleSeriesMetrics))
+	a.mux.HandleFunc("GET /api/v1/hosts/{id}/processes", a.requireSession(viewer, a.handleProcesses))
 	a.mux.HandleFunc("POST /api/v1/enrollment-tokens", a.requireOrigin(a.requireSession(admin, a.handleCreateToken)))
 	a.mux.HandleFunc("GET /api/v1/stream", a.requireSession(viewer, a.handleStream))
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
