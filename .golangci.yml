@@ -1,0 +1,51 @@
+version: "2"
+
+# Validated in CI with `golangci-lint config verify` before linting: OLD's CI
+# stayed red for days on a config key the linter no longer accepted.
+linters:
+  default: standard # errcheck, govet, ineffassign, staticcheck, unused
+  enable:
+    - bodyclose
+    - errorlint
+    - gosec
+    - misspell
+    - nilerr
+    - noctx
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - unconvert
+  settings:
+    errcheck:
+      # Close/Rollback on read paths cannot lose data: rows.Err() and Commit()
+      # carry the errors that matter. Closing a *written* file is NOT listed —
+      # that error can mean lost data and must be checked.
+      exclude-functions:
+        - (*database/sql.DB).Close
+        - (*database/sql.Rows).Close
+        - (*database/sql.Conn).Close
+        - (*database/sql.Tx).Rollback
+        - (*database/sql.Stmt).Close
+        - fmt.Fprintln
+        - fmt.Fprintf
+    gosec:
+      excludes:
+        - G104 # unhandled errors: errcheck owns this
+    revive:
+      rules:
+        - name: exported
+          disabled: true # doc comments enforced by review, not by lint noise
+  exclusions:
+    generated: strict
+    paths:
+      - testdata
+    rules:
+      - path: _test\.go
+        linters: [gosec, noctx]
+      # scripts/ci reads repository files by design.
+      - path: scripts/ci/
+        text: G304
+
+formatters:
+  enable:
+    - gofmt
