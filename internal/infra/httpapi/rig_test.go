@@ -16,6 +16,7 @@ import (
 	"github.com/getkin/kin-openapi/routers/gorillamux"
 
 	"github.com/MerhiOPS/sentrix/internal/app/alerting"
+	"github.com/MerhiOPS/sentrix/internal/app/export"
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
@@ -76,6 +77,7 @@ func newRig(t *testing.T) *rig {
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, r.auth, time.Now),
 		Ready:       func(context.Context) error { return r.notReady },
 		Plans:       identity.NewPlans(st, time.Now),
+		Export:      export.New(st, st, st, st),
 		System:      func(context.Context) (ServerStats, error) { return ServerStats{DBBytes: 4096, TTLOverdueS: 0}, nil },
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})
@@ -115,6 +117,8 @@ func seedTenant(t *testing.T, st *memstore.Store, h identity.PasswordHasher, nam
 // can be matched against test requests.
 func specRouter(t *testing.T) routers.Router {
 	t.Helper()
+	// NDJSON is a stream of JSON lines: validated as an opaque body.
+	openapi3filter.RegisterBodyDecoder("application/x-ndjson", openapi3filter.FileBodyDecoder)
 	doc, err := openapi3.NewLoader().LoadFromFile("../../../docs/openapi.yaml")
 	if err != nil {
 		t.Fatal(err)

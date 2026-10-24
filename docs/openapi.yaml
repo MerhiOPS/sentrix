@@ -480,6 +480,33 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Usage" }
         "401": { $ref: "#/components/responses/Error" }
+  /export:
+    get:
+      operationId: exportData
+      description: |
+        Admin only. Streams the tenant's own data: `metrics` (raw core
+        samples, kept 7 days by default), `logs`, or `alert_events`, as CSV
+        or NDJSON (default). Every parameter is validated before any byte is
+        sent, so a bad request is a JSON error. A failure after streaming
+        has started cannot change the status: NDJSON then ends with an
+        `{"error": …}` record; CSV simply ends early — use NDJSON when
+        completeness must be checked. At most 400 days per request.
+      parameters:
+        - { name: table, in: query, required: true, schema: { type: string, enum: [metrics, logs, alert_events] } }
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: format, in: query, schema: { type: string, enum: [csv, ndjson] } }
+        - { name: host, in: query, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: The export, streamed.
+          content:
+            text/csv: { schema: { type: string } }
+            application/x-ndjson: { schema: { type: string } }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:
