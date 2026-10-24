@@ -14,6 +14,17 @@ type Host struct {
 	CreatedAt    time.Time
 	LastSeen     time.Time  // zero until the first batch is stored
 	DisabledAt   *time.Time // nil while enabled
+	Health       HostHealth
+}
+
+// HostHealth is the agent's self-report plus what the server refused, so an
+// operator can tell "quiet host" from "host whose data is being dropped".
+type HostHealth struct {
+	BufferDepth   int           // batches waiting on the agent, last report
+	DroppedTotal  uint64        // batches the agent dropped since it started
+	ClockSkew     time.Duration // agent clock minus server clock
+	RejectedTotal uint64        // samples the server refused (clock, validity)
+	ConflictTotal uint64        // samples whose timestamp was already stored
 }
 
 // Enabled reports whether the host may ingest and be evaluated.

@@ -48,7 +48,7 @@ func TestCheckLayering(t *testing.T) {
 		"internal/infra/sqlite/ok.go":      goFile("", m+"app", "modernc.org/sqlite"),
 		"internal/infra/sqlite/wire.go":    goFile("", m+"wire"),
 		"internal/infra/ingesthttp/ok.go":  goFile("", m+"wire", m+"app"),
-		"internal/agent/ok.go":             goFile("", m+"wire", m+"infra/collector"),
+		"internal/agent/ok.go":             goFile("", m+"wire", m+"infra/collector", m+"infra/tlscert"),
 		"internal/agent/store.go":          goFile("", m+"infra/sqlite"),
 		"cmd/sentrix-server/main.go":       goFile("", m+"infra/sqlite", m+"wire"),
 		"internal/domainish/free.go":       goFile("", m+"infra/sqlite"),
