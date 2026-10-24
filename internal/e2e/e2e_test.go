@@ -32,6 +32,7 @@ type stack struct {
 	scope  domain.Scope
 	enroll *identity.Enrollment
 	hits   atomic.Int64 // requests that reached the handler
+	mode   atomic.Int32 // see serve
 }
 
 func newStack(t *testing.T) *stack {
@@ -58,7 +59,7 @@ func newStack(t *testing.T) *stack {
 		ingest.NewService(st, ingest.DefaultWindow, time.Now), s.enroll)
 	s.srv = httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.hits.Add(1)
-		h.ServeHTTP(w, r)
+		s.serve(h, w, r)
 	}))
 	s.srv.TLS = tlscert.ServerConfig(cert)
 	s.srv.StartTLS()

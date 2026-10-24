@@ -51,6 +51,7 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 			continue
 		}
 		h.samples[k] = smp
+		h.rollup1m[k], h.rollup1h[k] = smp, smp
 		res.Stored++
 	}
 	s.applyDetails(h, p.Details, &res)

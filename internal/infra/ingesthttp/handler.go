@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
@@ -33,12 +35,14 @@ type Handler struct {
 	auth   Authenticator
 	ingest Ingester
 	enroll Enroller
+	limit  *limiter
 	mux    *http.ServeMux
 }
 
 // NewHandler wires the endpoints.
 func NewHandler(auth Authenticator, ing Ingester, enr Enroller) *Handler {
-	h := &Handler{auth: auth, ingest: ing, enroll: enr, mux: http.NewServeMux()}
+	h := &Handler{auth: auth, ingest: ing, enroll: enr, limit: newLimiter(HostRate, HostBurst, time.Now),
+		mux: http.NewServeMux()}
 	h.mux.HandleFunc("POST "+wire.PathBatch, h.handleBatch)
 	h.mux.HandleFunc("POST "+wire.PathEnroll, h.handleEnroll)
 	return h
@@ -55,6 +59,11 @@ func (h *Handler) handleBatch(w http.ResponseWriter, r *http.Request) {
 	ah, err := h.auth.Authenticate(r.Context(), cred)
 	if err != nil {
 		writeError(w, r, err)
+		return
+	}
+	if ok, wait := h.limit.allow(ah.Host); !ok {
+		w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(wait)))
+		writeJSON(w, http.StatusTooManyRequests, wire.Error{Error: "rate limited: resend after Retry-After"})
 		return
 	}
 	var b wire.Batch

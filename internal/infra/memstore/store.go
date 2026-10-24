@@ -47,6 +47,10 @@ type host struct {
 	seqs     map[uint64]int64 // seq → received unix ms
 	counters ingest.CounterState
 	samples  map[int64]domain.CoreSample // by ts unix ms
+	// rollup1m and rollup1h are what the rollup tables hold: copies of the
+	// samples with their own retention, so pruning raw keeps the history.
+	rollup1m map[int64]domain.CoreSample
+	rollup1h map[int64]domain.CoreSample
 	latest   *domain.CoreSample
 	series   map[string]*mseries // by metric|labels hash
 	snaps    map[int64]domain.ProcessSnapshot

@@ -9,6 +9,8 @@ package main
 import (
 	"fmt"
 	"os"
+
+	"github.com/MerhiOPS/sentrix/internal/buildinfo"
 )
 
 func main() {
@@ -32,7 +34,7 @@ func run(args []string) error {
 	case "user":
 		return subcommand(rest, "create", userCreate)
 	case "version":
-		fmt.Println(version)
+		fmt.Println(buildinfo.Describe(version))
 		return nil
 	default:
 		return usage()

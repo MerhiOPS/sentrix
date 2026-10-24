@@ -452,6 +452,23 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /system:
+    get:
+      operationId: getSystem
+      description: |
+        Admin only. The tenant's fleet health plus server-wide figures
+        (database and WAL size, disk headroom, retention lag, live-feed
+        drops). Liveness and readiness probes live outside this API at
+        `GET /healthz` (process alive, no dependency checks) and
+        `GET /readyz` (the database answers and the writer drains; 503 if not).
+      responses:
+        "200":
+          description: The report.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/System" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:
@@ -821,3 +838,34 @@ components:
         value: { type: number }
         at: { type: string, format: date-time }
         resolved: { type: boolean }
+    System:
+      type: object
+      required: [server_time, fleet, server]
+      properties:
+        server_time: { type: string, format: date-time }
+        fleet:
+          type: object
+          required: [hosts, reporting, stale, no_data, disabled, max_host_lag_s, agent_wal_depth_max, agent_wal_depth_total, agent_dropped_total]
+          properties:
+            hosts: { type: integer }
+            reporting: { type: integer }
+            stale: { type: integer }
+            no_data: { type: integer }
+            disabled: { type: integer }
+            max_host_lag_s: { type: integer, description: Longest silence among enabled hosts that have reported. }
+            agent_wal_depth_max: { type: integer, description: Largest agent backlog (batches waiting on disk). }
+            agent_wal_depth_total: { type: integer }
+            agent_dropped_total: { type: integer, description: "Batches agents dropped (WAL full, too old, refused)." }
+        server:
+          type: object
+          required: [db_bytes, db_wal_bytes, disk_free_ratio, ttl_overdue_s, janitor_last_run, ws_subscribers, ws_dropped, writer_waits, writer_wait_ms]
+          properties:
+            db_bytes: { type: integer }
+            db_wal_bytes: { type: integer }
+            disk_free_ratio: { type: number, nullable: true }
+            ttl_overdue_s: { type: integer, description: Age of the oldest row past its retention; should stay near zero. }
+            janitor_last_run: { type: string, format: date-time, nullable: true }
+            ws_subscribers: { type: integer }
+            ws_dropped: { type: integer, description: Live frames dropped for slow subscribers. }
+            writer_waits: { type: integer }
+            writer_wait_ms: { type: integer }

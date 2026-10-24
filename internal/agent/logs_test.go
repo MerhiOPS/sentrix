@@ -61,26 +61,35 @@ func (r *recordingSource) Commit(m logtail.Mark) ([]byte, error) {
 func (r *recordingSource) Restore([]byte) error { return nil }
 func (r *recordingSource) Close() error         { return nil }
 
-// TestPositionsAdvanceOnlyWhenBatchSettles: R1 — a sent-but-unacknowledged
-// batch must not move the position; acked and permanently refused do.
-func TestPositionsAdvanceOnlyWhenBatchSettles(t *testing.T) {
-	for _, c := range []struct {
-		status int
-		commit bool
-	}{{http.StatusOK, true}, {http.StatusUnprocessableEntity, true}, {http.StatusServiceUnavailable, false}} {
-		s, buf, _ := newTestShipper(t, c.status)
-		dir := t.TempDir()
-		src := &recordingSource{}
-		s.settled = func(p Pending) {
-			_ = commitPositions(dir, map[string]logtail.Source{"rec": src}, p.Marks)
+// TestPositionsAdvanceOnceInWAL: R1 — a batch's positions are committed
+// once it is durably in the WAL (from there it is resent until acknowledged,
+// or dropped and counted), and never when it could not be written.
+func TestPositionsAdvanceOnceInWAL(t *testing.T) {
+	for _, writable := range []bool{true, false} {
+		state := t.TempDir()
+		wal, err := OpenWAL(state, DefaultWALBytes, DefaultWALAge, time.Now)
+		if err != nil {
+			t.Fatal(err)
 		}
+		if !writable {
+			blocker := filepath.Join(state, "not-a-dir")
+			if err := os.WriteFile(blocker, nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			wal.dir = filepath.Join(blocker, "wal") // every write fails: its parent is a file
+		}
+		src := &recordingSource{}
+		a := &Agent{cfg: Config{StateDir: state}, buf: wal, logSrc: map[string]logtail.Source{"rec": src},
+			log: slog.New(slog.DiscardHandler)}
 		p := pending(t, 1)
 		p.Marks = map[string]logtail.Mark{"rec": "pos-1"}
-		buf.Push(p)
-		s.handle(context.Background(), p)
-		_, err := os.Stat(positionFile(dir, "rec"))
-		if (len(src.committed) == 1) != c.commit || (err == nil) != c.commit {
-			t.Fatalf("status %d: committed %v, file exists %v; want commit=%v", c.status, src.committed, err == nil, c.commit)
+		a.enqueue(p)
+		_, statErr := os.Stat(positionFile(state, "rec"))
+		if (len(src.committed) == 1) != writable || (statErr == nil) != writable {
+			t.Fatalf("writable=%v: committed %v, position file %v", writable, src.committed, statErr == nil)
+		}
+		if !writable && (wal.Dropped() != 1 || wal.WriteFailures() != 1) {
+			t.Fatalf("a failed write was not counted: dropped %d failures %d", wal.Dropped(), wal.WriteFailures())
 		}
 	}
 }
@@ -117,7 +126,7 @@ func TestAgentShipsFileLinesAndPersistsPositionAfterAck(t *testing.T) {
 	}
 	state, err := os.ReadFile(positionFile(cfg.StateDir, "files"))
 	if err != nil || !strings.Contains(string(state), `"offset":19`) {
-		t.Fatalf("position after ack: %s %v (want offset 19)", state, err)
+		t.Fatalf("position after the batch reached the WAL: %s %v (want offset 19)", state, err)
 	}
 }
 

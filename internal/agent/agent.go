@@ -16,14 +16,15 @@ type Config struct {
 	Interval     time.Duration // sampling interval
 	BatchEvery   time.Duration // how often samples are sealed into a batch
 	ProcessEvery time.Duration // how often a top-N process snapshot is taken
-	BufferMax    int           // batches held while the server is unreachable
+	WALBytes     int64         // disk backlog bound while the server is unreachable
+	WALAge       time.Duration // batches older than this are dropped locally
 }
 
 // DefaultConfig is 5 s samples in 10 s batches, a process snapshot every
-// 30 s, holding an hour of backlog.
+// 30 s, and a 100 MB disk backlog.
 func DefaultConfig(stateDir string) Config {
 	return Config{StateDir: stateDir, Interval: 5 * time.Second, BatchEvery: 10 * time.Second,
-		ProcessEvery: domain.ProcessSnapshotGap, BufferMax: 360}
+		ProcessEvery: domain.ProcessSnapshotGap, WALBytes: DefaultWALBytes, WALAge: DefaultWALAge}
 }
 
 // Collector takes one core sample.
@@ -57,7 +58,7 @@ type Agent struct {
 	cfg     Config
 	src     Sources
 	batcher *Batcher
-	buf     *Buffer
+	buf     *WAL
 	ship    *Shipper
 	logSrc  map[string]logtail.Source
 	log     *slog.Logger
@@ -77,7 +78,11 @@ func New(cfg Config, id Identity, src Sources, log *slog.Logger) (*Agent, error)
 	if err != nil {
 		return nil, err
 	}
-	a := &Agent{cfg: cfg, src: src, buf: NewBuffer(cfg.BufferMax), log: log}
+	wal, err := OpenWAL(cfg.StateDir, cfg.WALBytes, cfg.WALAge, time.Now)
+	if err != nil {
+		return nil, err
+	}
+	a := &Agent{cfg: cfg, src: src, buf: wal, log: log}
 	a.ship = NewShipper(client, id, a.buf, log)
 	a.logSrc = map[string]logtail.Source{}
 	for _, s := range src.Logs {
@@ -86,7 +91,6 @@ func New(cfg Config, id Identity, src Sources, log *slog.Logger) (*Agent, error)
 	if err := restorePositions(cfg.StateDir, src.Logs); err != nil {
 		return nil, err
 	}
-	a.ship.settled = a.settle
 	a.batcher = NewBatcher(seq, cfg.Interval, a)
 	return a, nil
 }
@@ -96,8 +100,8 @@ func New(cfg Config, id Identity, src Sources, log *slog.Logger) (*Agent, error)
 const drainTimeout = 5 * time.Second
 
 // Run collects and ships until ctx ends. On shutdown it seals what it has
-// and gives the shipper drainTimeout to send it; anything still unsent is
-// lost until the disk WAL lands in Phase 6.
+// and gives the shipper drainTimeout to send it; anything still unsent stays
+// in the WAL for the next start.
 func (a *Agent) Run(ctx context.Context) {
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -175,7 +179,7 @@ func (a *Agent) seal() {
 		return
 	}
 	for _, p := range ps {
-		a.buf.Push(p)
+		a.enqueue(p)
 	}
 }
 
@@ -191,13 +195,19 @@ func (a *Agent) pollLogs(ctx context.Context) {
 	}
 }
 
-// settle commits the log positions of a batch that left the buffer for good.
-func (a *Agent) settle(p Pending) {
+// enqueue writes a batch to the WAL and, once it is there, commits the log
+// positions it completes. A batch that could not be written leaves the
+// positions where they were, so a restart reads those lines again.
+func (a *Agent) enqueue(p Pending) {
+	if err := a.buf.Push(p); err != nil {
+		a.log.Error("batch not kept", "seq", p.Seq, "err", err)
+		return
+	}
 	if len(p.Marks) == 0 {
 		return
 	}
 	if err := commitPositions(a.cfg.StateDir, a.logSrc, p.Marks); err != nil {
-		a.log.Warn("persist log positions", "err", err) // retried with the next settled batch
+		a.log.Warn("persist log positions", "err", err) // retried with the next batch
 	}
 }
 

@@ -50,20 +50,6 @@ func TestBackoffIsBoundedAndJittered(t *testing.T) {
 	}
 }
 
-func TestBufferDropsOldestWhenFull(t *testing.T) {
-	b := NewBuffer(2)
-	for i := uint64(1); i <= 3; i++ {
-		b.Push(Pending{Seq: i})
-	}
-	if h, _ := b.Head(); h.Seq != 2 || b.Len() != 2 || b.Dropped() != 1 {
-		t.Fatalf("head %d len %d dropped %d", h.Seq, b.Len(), b.Dropped())
-	}
-	b.Remove(99) // not the head: ignored
-	if b.Len() != 2 {
-		t.Fatal("Remove of a non-head seq removed something")
-	}
-}
-
 // scripted serves batch responses from a list of statuses and records seqs.
 type scripted struct {
 	mu       sync.Mutex
@@ -90,13 +76,16 @@ func (s *scripted) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func newTestShipper(t *testing.T, statuses ...int) (*Shipper, *Buffer, *scripted) {
+func newTestShipper(t *testing.T, statuses ...int) (*Shipper, *WAL, *scripted) {
 	t.Helper()
 	srv := &scripted{statuses: statuses}
 	ts := httptest.NewServer(srv)
 	t.Cleanup(ts.Close)
 	c, _ := NewClient(ts.URL, nil)
-	buf := NewBuffer(10)
+	buf, err := OpenWAL(t.TempDir(), DefaultWALBytes, DefaultWALAge, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
 	s := NewShipper(c, Identity{ServerURL: ts.URL, Credential: "x"}, buf, slog.New(slog.DiscardHandler))
 	s.backoff.rnd = func() float64 { return 0 }
 	return s, buf, srv
@@ -114,7 +103,7 @@ func pending(t *testing.T, seq uint64) Pending {
 func TestShipperRetriesSameBatchThenAcks(t *testing.T) {
 	s, buf, srv := newTestShipper(t, 503, 500, 0, 200)
 	srv.statuses[2] = http.StatusBadGateway
-	buf.Push(pending(t, 7))
+	mustPush(t, buf, pending(t, 7))
 	for i := 0; i < 4 && buf.Len() > 0; i++ {
 		s.handle(context.Background(), pending(t, 7))
 	}
@@ -130,13 +119,13 @@ func TestShipperRetriesSameBatchThenAcks(t *testing.T) {
 
 func TestShipperDropsInvalidAndKeepsOnStop(t *testing.T) {
 	s, buf, _ := newTestShipper(t, 422)
-	buf.Push(pending(t, 1))
+	mustPush(t, buf, pending(t, 1))
 	s.handle(context.Background(), pending(t, 1))
 	if buf.Len() != 0 || buf.Dropped() != 1 {
 		t.Fatalf("422: len %d dropped %d, want dropped and counted", buf.Len(), buf.Dropped())
 	}
 	s2, buf2, _ := newTestShipper(t, 401)
-	buf2.Push(pending(t, 2))
+	mustPush(t, buf2, pending(t, 2))
 	if wait := s2.handle(context.Background(), pending(t, 2)); wait != stoppedRecheck || buf2.Len() != 1 {
 		t.Fatalf("401: wait %v len %d, want batch kept and recheck later", wait, buf2.Len())
 	}
@@ -144,9 +133,16 @@ func TestShipperDropsInvalidAndKeepsOnStop(t *testing.T) {
 
 func TestDrainStopsOnFirstFailure(t *testing.T) {
 	s, buf, _ := newTestShipper(t, 200, 503)
-	buf.Push(pending(t, 1))
-	buf.Push(pending(t, 2))
+	mustPush(t, buf, pending(t, 1))
+	mustPush(t, buf, pending(t, 2))
 	if left := s.Drain(context.Background()); left != 1 {
 		t.Fatalf("Drain left %d batches, want 1 (gives up on the 503, no retry loop)", left)
+	}
+}
+
+func mustPush(t *testing.T, w *WAL, p Pending) {
+	t.Helper()
+	if err := w.Push(p); err != nil {
+		t.Fatal(err)
 	}
 }

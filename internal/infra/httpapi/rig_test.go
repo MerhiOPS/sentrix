@@ -45,6 +45,7 @@ type rig struct {
 	srv      *httptest.Server
 	redactor *redact.Redactor
 	auth     *ingest.Authenticator
+	notReady error // what the readiness probe reports
 	router   routers.Router
 	a, b     tenantRig
 }
@@ -73,6 +74,8 @@ func newRig(t *testing.T) *rig {
 		Hosts: st, Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: r.hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, r.redactor),
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, r.auth, time.Now),
+		Ready:       func(context.Context) error { return r.notReady },
+		System:      func(context.Context) (ServerStats, error) { return ServerStats{DBBytes: 4096, TTLOverdueS: 0}, nil },
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})
 	r.srv = httptest.NewServer(api)

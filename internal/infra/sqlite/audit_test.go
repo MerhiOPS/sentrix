@@ -14,10 +14,11 @@ var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches
 // unscopedAllowed are the only statements that may touch tenant tables
 // without a tenant predicate, each because it is how the tenant is *found*.
 var unscopedAllowed = map[string]string{
-	"WHERE h.credential_hash = ?":                      "agent credential → tenant (AuthenticateCredential)",
-	"WHERE secret_hash = ? AND used_at IS NULL":        "enrollment token → tenant (RedeemToken)",
-	"WHERE u.email = ?":                                "login email → tenant (FindLogin)",
-	"WHERE s.token_hash = ? AND u.disabled_at IS NULL": "session cookie → tenant (GetSession)",
+	"WHERE h.credential_hash = ?":                                        "agent credential → tenant (AuthenticateCredential)",
+	"WHERE secret_hash = ? AND used_at IS NULL":                          "enrollment token → tenant (RedeemToken)",
+	"WHERE u.email = ?":                                                  "login email → tenant (FindLogin)",
+	"WHERE s.token_hash = ? AND u.disabled_at IS NULL":                   "session cookie → tenant (GetSession)",
+	"FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key": "retention janitor enumerates (tenant, host) under an OpsScope",
 }
 
 // auditProblems returns every statement that touches a tenant table without
