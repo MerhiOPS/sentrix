@@ -11,3 +11,6 @@ for g in adm systemd-journal; do
         usermod -a -G "$g" sentrix-agent
     fi
 done
+# The state directory must exist before the first start: enrollment writes
+# the identity into it (systemd's StateDirectory only appears at start).
+install -d -o sentrix-agent -g sentrix-agent -m 0700 /var/lib/sentrix-agent

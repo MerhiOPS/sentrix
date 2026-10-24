@@ -101,3 +101,32 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+
+  # Clean-machine acceptance (PLAN Phase 6 and 8): a fresh runner is the
+  # clean VM. The image's demo must reach live data within 60 s; the .deb
+  # packages must install, run under systemd and report.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: docker run to live charts
+        run: scripts/smoke-docker.sh
+
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.43.0
+      - name: build packages
+        run: PATH="$PATH:$(go env GOPATH)/bin" scripts/package.sh v0.0.0-ci
+      - name: install and run the .deb packages
+        run: scripts/smoke-deb.sh dist
+
