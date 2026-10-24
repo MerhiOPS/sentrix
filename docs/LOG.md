@@ -5,6 +5,76 @@ why. Newest first.
 
 ---
 
+## Phase 8 — Showcase polish · 2026-10-24
+
+**Landed**
+- **Demo mode** (`serve --demo`): seeds a tenant, an admin with a random
+  password (printed at start, kept in `demo.json` 0600) and an alert rule,
+  and runs four simulated hosts. Each is the **real agent** — batcher, disk
+  WAL, enrollment, pinned TLS — with simulated collectors, enrolled through
+  the server's own ingest listener (`agent.EnrollAs`, so the demo never sends
+  the machine's real hostname). Their logs carry an email, an address and a
+  bearer token, so the server's redaction is visible; web-01 crosses the
+  alert threshold every 10 minutes, so the alert fires and resolves.
+  The demo's dashboard may be plain HTTP on any address (a container
+  publishes it); nothing else relaxes that check, and `--demo --insecure`
+  is refused.
+- **Docker image** (`Dockerfile`: Node build → Go build → distroless static,
+  nonroot, `/data` volume; default command is the demo).
+- **README** (quick start, install, architecture diagram, measured numbers
+  with where each comes from, screenshots) and `docs/STORAGE-ADAPTERS.md`
+  (the ports, the contract and its reflected cross-tenant suite, the
+  `CommitBatch` atomicity caveat and how a ClickHouse adapter would rebuild
+  it, erasure and retention there, and when it is worth it).
+- **Clean-machine CI** — a fresh GitHub runner is the clean VM:
+  `scripts/smoke-docker.sh` builds the image, runs it, logs in and times
+  live data; `scripts/smoke-deb.sh` installs the real `.deb` packages, runs
+  both services under systemd, enrolls the packaged agent, checks it
+  reports, and restarts both.
+- Screenshots retaken from the demo; the earlier ones showed this
+  workstation's hostname.
+
+**Acceptance**
+- on a clean VM, `docker run` → login → live charts in under 60 s, timed —
+  CI (`docker` job): **10.5 s** from `docker run` to a logged-in session with
+  live data on all four hosts ✅ (the image is built in CI, not pulled from a
+  registry: publishing an image is the owner's call)
+- from-source build time recorded — web 3.3 s + Go 9.6 s with a cold build
+  cache (module cache warm) ≈ 13 s on 16 threads ✅
+- security pass — tracked files scanned for usernames, server addresses,
+  keys and emails (only test fixtures and documentation ranges);
+  `govulncheck`: no vulnerable code reached (one advisory in
+  `golang.org/x/crypto/openpgp`, a package Sentrix never imports, no fix
+  available); `npm audit`: 0 vulnerabilities ✅
+- Phase 6's open item, partly closed: the `.deb` packages install, start
+  under systemd, enroll and report on a clean runner, and come back after a
+  service restart (`packages` job ✅). A machine **reboot** is still untested
+  (a CI runner cannot reboot).
+
+**Caught before shipping**
+- `--demo` would have blocked the server's start: the demo enrolls through
+  the listener, so it now runs after it.
+- `agent.Enroll` sends the machine's hostname: the demo would have shown the
+  real hostname four times.
+- The packages started nothing on first install because `enroll` and
+  `tenant create` run before the first start, when systemd has not yet
+  created the state directory — the pre-install scripts create it.
+- On this workstation the dashboard showed no logs: `/home` is 96 % full and
+  the disk guard (logs shed below 20 % free) was doing its job. The demo ran
+  on another filesystem for the screenshots.
+- Demo log lines produced impossible addresses (`203.0.113.361`) that the
+  redactor correctly left alone — the generator now keeps octets valid.
+
+**Still open (end of v1)**
+- `.deb` survival across a real reboot; the Windows service run on a real
+  Windows host.
+- Erasure: verifying FTS `optimize` (Phase 7).
+- Rare-term log search latency (Phase 4).
+- The Phase 2–4 screenshots with the hostname remain in git history; removing
+  them needs a history rewrite and force-push — the owner's decision.
+
+---
+
 ## Phase 7 — Commercial-lite + compliance · 2026-10-24
 
 **Landed**
