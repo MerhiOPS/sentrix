@@ -186,3 +186,20 @@ func (s *Store) SetHostDisabled(_ context.Context, sc domain.Scope, id domain.Ho
 	h.h.DisabledAt = at
 	return nil
 }
+
+// FailUndelivered implements alerting.Sweeper.
+func (s *Store) FailUndelivered(_ context.Context, ops domain.OpsScope, reason string) (int, error) {
+	if _, err := ops.Reason(); err != nil {
+		return 0, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	n := 0
+	for i, e := range s.alerts.events {
+		if e.v.Notify && e.v.Outcome == "" {
+			s.alerts.events[i].v.Outcome, s.alerts.events[i].v.Delivery = "failed", reason
+			n++
+		}
+	}
+	return n, nil
+}

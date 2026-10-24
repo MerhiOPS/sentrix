@@ -377,6 +377,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/system": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Admin only. The tenant's fleet health plus server-wide figures
+         *     (database and WAL size, disk headroom, retention lag, live-feed
+         *     drops). Liveness and readiness probes live outside this API at
+         *     `GET /healthz` (process alive, no dependency checks) and
+         *     `GET /readyz` (the database answers and the writer drains; 503 if not).
+         */
+        get: operations["getSystem"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -711,6 +734,38 @@ export interface components {
             /** Format: date-time */
             at: string;
             resolved: boolean;
+        };
+        System: {
+            /** Format: date-time */
+            server_time: string;
+            fleet: {
+                hosts: number;
+                reporting: number;
+                stale: number;
+                no_data: number;
+                disabled: number;
+                /** @description Longest silence among enabled hosts that have reported. */
+                max_host_lag_s: number;
+                /** @description Largest agent backlog (batches waiting on disk). */
+                agent_wal_depth_max: number;
+                agent_wal_depth_total: number;
+                /** @description Batches agents dropped (WAL full, too old, refused). */
+                agent_dropped_total: number;
+            };
+            server: {
+                db_bytes: number;
+                db_wal_bytes: number;
+                disk_free_ratio: number | null;
+                /** @description Age of the oldest row past its retention; should stay near zero. */
+                ttl_overdue_s: number;
+                /** Format: date-time */
+                janitor_last_run: string | null;
+                ws_subscribers: number;
+                /** @description Live frames dropped for slow subscribers. */
+                ws_dropped: number;
+                writer_waits: number;
+                writer_wait_ms: number;
+            };
         };
     };
     responses: {
@@ -1440,6 +1495,28 @@ export interface operations {
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
             404: components["responses"]["Error"];
+        };
+    };
+    getSystem: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The report. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["System"];
+                };
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
         };
     };
 }

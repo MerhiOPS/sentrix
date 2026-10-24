@@ -46,7 +46,7 @@ func (c *seriesCache) merge(pending map[seriesID]int64) {
 
 // seriesResolver resolves series within one batch transaction.
 type seriesResolver struct {
-	tx      *sql.Tx
+	tx      *batchTx
 	tk, hk  int64
 	cache   *seriesCache
 	pending map[seriesID]int64

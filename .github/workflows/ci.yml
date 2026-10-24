@@ -40,6 +40,15 @@ jobs:
       - name: go test
         if: runner.os == 'Windows'
         run: go test -count=1 ./...
+      # Named, verbose, and failing if they do not run: the credential's DPAPI
+      # protection and the state directory's ACL exist only on Windows.
+      - name: Windows credential protection tests
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          out=$(go test -count=1 -v -run 'TestDPAPIRoundTripAndIdentityProtection|TestRestrictToServiceSetsProtectedACL' ./internal/agent)
+          echo "$out"
+          [ "$(echo "$out" | grep -c -- '--- PASS')" -eq 2 ]
 
       - name: cross-compile linux and windows, no cgo
         if: runner.os == 'Linux'

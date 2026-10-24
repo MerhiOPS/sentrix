@@ -60,6 +60,15 @@ type TenantLister interface {
 	ListTenants(ctx context.Context, ops domain.OpsScope) ([]domain.TenantID, error)
 }
 
+// Sweeper settles notifications a previous process queued but never
+// delivered. Run at startup, before the dispatcher; cross-tenant.
+type Sweeper interface {
+	FailUndelivered(ctx context.Context, ops domain.OpsScope, reason string) (int, error)
+}
+
+// UndeliveredReason is recorded on events swept at startup.
+const UndeliveredReason = "server restarted before delivery"
+
 // Message is what a notifier sends.
 type Message struct {
 	Rule     string

@@ -14,11 +14,12 @@ import (
 type Store struct {
 	db     *DB
 	series seriesCache
+	stmts  *stmtCache
 	now    func() time.Time // the log quota's accounting clock
 }
 
 // NewStore wraps an opened, migrated database.
-func NewStore(db *DB) *Store { return &Store{db: db, now: time.Now} }
+func NewStore(db *DB) *Store { return &Store{db: db, stmts: newStmtCache(db.Writer()), now: time.Now} }
 
 // SetClock replaces the accounting clock (tests).
 func (s *Store) SetClock(now func() time.Time) { s.now = now }

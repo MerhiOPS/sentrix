@@ -215,3 +215,35 @@ func testHostDisableAndList(t *testing.T, st Stores) {
 		t.Fatal("ListTenants accepted a zero OpsScope")
 	}
 }
+
+// testSweepUndelivered: only events that were due a notification and never
+// got an outcome are marked; delivered and never-notified ones are untouched.
+func testSweepUndelivered(t *testing.T, st Stores) {
+	ctx := context.Background()
+	f := newFixture(t, st, "a")
+	rule, _ := st.CreateRule(ctx, f.scope, alertRule(nil, nil))
+	record := func(notify bool, at time.Time) int64 {
+		id, err := st.RecordTransition(ctx, f.scope, domain.RuleHostState{Rule: rule, Host: f.host, State: domain.StateFiring, Since: at},
+			&domain.AlertEvent{From: domain.StateOK, To: domain.StateFiring, At: at, Notify: notify})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	pending, delivered, silent := record(true, T0), record(true, T0.Add(time.Minute)), record(false, T0.Add(2*time.Minute))
+	if err := st.SetDelivery(ctx, f.scope, delivered, "delivered", ""); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := st.FailUndelivered(ctx, mustOps(t), "restarted"); err != nil || n != 1 {
+		t.Fatalf("swept %d, %v; want exactly the pending one", n, err)
+	}
+	want := map[int64]string{pending: "failed", delivered: "delivered", silent: ""}
+	for _, e := range must(st.ListEvents(ctx, f.scope, 10)) {
+		if e.Outcome != want[e.ID] {
+			t.Fatalf("event %d outcome %q, want %q", e.ID, e.Outcome, want[e.ID])
+		}
+	}
+	if _, err := st.FailUndelivered(ctx, domain.OpsScope{}, "x"); err == nil {
+		t.Fatal("zero OpsScope accepted")
+	}
+}

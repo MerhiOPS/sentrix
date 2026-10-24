@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"strings"
 
@@ -10,7 +9,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
-func loadCounters(ctx context.Context, tx *sql.Tx, tk, hk int64) (ingest.CounterState, error) {
+func loadCounters(ctx context.Context, tx *batchTx, tk, hk int64) (ingest.CounterState, error) {
 	rows, err := tx.QueryContext(ctx,
 		`SELECT counter, last_raw, offset FROM host_counters WHERE tenant_key = ? AND host_key = ?`, tk, hk)
 	if err != nil {
@@ -36,7 +35,7 @@ func loadCounters(ctx context.Context, tx *sql.Tx, tk, hk int64) (ingest.Counter
 // writePrepared writes everything a batch produces except its seq record.
 // Only samples actually inserted reach the rollups: a conflicting duplicate
 // is counted, never aggregated twice.
-func writePrepared(ctx context.Context, tx *sql.Tx, tk, hk int64, p ingest.Prepared, sr *seriesResolver) (ingest.CommitResult, error) {
+func writePrepared(ctx context.Context, tx *batchTx, tk, hk int64, p ingest.Prepared, sr *seriesResolver) (ingest.CommitResult, error) {
 	var res ingest.CommitResult
 	for _, smp := range p.Samples {
 		inserted, err := insertCore(ctx, tx, `INSERT OR IGNORE INTO metrics_core`, tk, hk, smp)
@@ -87,7 +86,7 @@ func coreArgs(tk, hk int64, s domain.CoreSample) ([]any, error) {
 const coreColumns = `(tenant_key, host_key, ts, cpu, mem, disk, load1, load5, load15,
 	mem_used, uptime, net_rx, net_tx, disk_r, disk_w) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
 
-func insertCore(ctx context.Context, tx *sql.Tx, verb string, tk, hk int64, s domain.CoreSample) (bool, error) {
+func insertCore(ctx context.Context, tx *batchTx, verb string, tk, hk int64, s domain.CoreSample) (bool, error) {
 	args, err := coreArgs(tk, hk, s)
 	if err != nil {
 		return false, err
@@ -102,7 +101,7 @@ func insertCore(ctx context.Context, tx *sql.Tx, verb string, tk, hk int64, s do
 
 // upsertLatest keeps the newest sample per host. The WHERE guard means an
 // older batch (a late replay) cannot move the fleet grid backwards.
-func upsertLatest(ctx context.Context, tx *sql.Tx, tk, hk int64, s domain.CoreSample) error {
+func upsertLatest(ctx context.Context, tx *batchTx, tk, hk int64, s domain.CoreSample) error {
 	args, err := coreArgs(tk, hk, s)
 	if err != nil {
 		return err
@@ -121,7 +120,7 @@ func upsertLatest(ctx context.Context, tx *sql.Tx, tk, hk int64, s domain.CoreSa
 	return nil
 }
 
-func saveCounters(ctx context.Context, tx *sql.Tx, tk, hk int64, st ingest.CounterState) error {
+func saveCounters(ctx context.Context, tx *batchTx, tk, hk int64, st ingest.CounterState) error {
 	for name, cv := range st {
 		last, err := encU64(cv.LastRaw)
 		if err != nil {
@@ -143,7 +142,7 @@ func saveCounters(ctx context.Context, tx *sql.Tx, tk, hk int64, st ingest.Count
 }
 
 // touchHost records liveness and the agent's self-report.
-func touchHost(ctx context.Context, tx *sql.Tx, tk, hk int64, p ingest.Prepared, conflicts int) error {
+func touchHost(ctx context.Context, tx *batchTx, tk, hk int64, p ingest.Prepared, conflicts int) error {
 	dropped, err := encU64(p.Agent.DroppedTotal)
 	if err != nil {
 		return err

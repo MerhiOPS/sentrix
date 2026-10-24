@@ -1,0 +1,42 @@
+[Unit]
+Description=Sentrix agent (host metrics and logs)
+Documentation=https://github.com/MerhiOPS/sentrix
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sentrix-agent
+Group=sentrix-agent
+# adm: /var/log/syslog, /var/log/auth.log, nginx logs (Debian/Ubuntu).
+# systemd-journal: the journal (--journald).
+SupplementaryGroups=adm systemd-journal
+EnvironmentFile=-/etc/default/sentrix-agent
+ExecStart=/usr/bin/sentrix-agent run --state-dir /var/lib/sentrix-agent $SENTRIX_AGENT_ARGS
+Restart=always
+RestartSec=10s
+# The agent seals and drains for at most 5 s; unsent batches stay in its WAL.
+TimeoutStopSec=15s
+StateDirectory=sentrix-agent
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening: read-only system, writes only to the state directory.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+CapabilityBoundingSet=
+# RHEL keeps /var/log/messages root-only. To tail it, grant (deliberately,
+# not by default):  AmbientCapabilities=CAP_DAC_READ_SEARCH
+#                   CapabilityBoundingSet=CAP_DAC_READ_SEARCH
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

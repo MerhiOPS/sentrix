@@ -1,0 +1,6 @@
+# Extra flags for `sentrix-agent run` (see `sentrix-agent run --help`).
+# Nothing is tailed unless listed: log content is the data most likely to
+# hold secrets.
+#
+# SENTRIX_AGENT_ARGS="--interval 5s --journald --log-file /var/log/nginx/*.log"
+SENTRIX_AGENT_ARGS="--interval 5s"

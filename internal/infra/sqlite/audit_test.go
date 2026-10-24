@@ -19,6 +19,7 @@ var unscopedAllowed = map[string]string{
 	"WHERE u.email = ?":                                                  "login email → tenant (FindLogin)",
 	"WHERE s.token_hash = ? AND u.disabled_at IS NULL":                   "session cookie → tenant (GetSession)",
 	"FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key": "retention janitor enumerates (tenant, host) under an OpsScope",
+	"WHERE notify = 1 AND outcome = ''":                                  "startup sweep of undelivered alerts, every tenant, under an OpsScope",
 }
 
 // auditProblems returns every statement that touches a tenant table without

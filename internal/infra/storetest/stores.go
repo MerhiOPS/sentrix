@@ -42,6 +42,7 @@ type Stores interface {
 	alerting.StateRepo
 	alerting.BucketReader
 	alerting.TenantLister
+	alerting.Sweeper
 	retention.Store
 }
 

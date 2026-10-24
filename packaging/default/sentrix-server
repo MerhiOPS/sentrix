@@ -1,0 +1,6 @@
+# Extra flags for `sentrix-server serve` (see `sentrix-server serve --help`).
+# The dashboard stays on loopback unless --api-tls is given; put it behind a
+# TLS reverse proxy or pass --api-tls with --tls-cert/--tls-key.
+#
+# SENTRIX_SERVER_ARGS="--listen :8443 --api-listen 127.0.0.1:8080"
+SENTRIX_SERVER_ARGS="--listen :8443 --api-listen 127.0.0.1:8080"

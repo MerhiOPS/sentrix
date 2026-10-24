@@ -2,7 +2,6 @@ package sqlite
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -49,7 +48,7 @@ type procJSON struct {
 }
 
 // writeSnapshots stores process snapshots as JSON blobs.
-func writeSnapshots(ctx context.Context, tx *sql.Tx, tk, hk int64, snaps []domain.ProcessSnapshot, res *ingest.CommitResult) error {
+func writeSnapshots(ctx context.Context, tx *batchTx, tk, hk int64, snaps []domain.ProcessSnapshot, res *ingest.CommitResult) error {
 	for _, s := range snaps {
 		procs := make([]procJSON, len(s.Procs))
 		for i, p := range s.Procs {

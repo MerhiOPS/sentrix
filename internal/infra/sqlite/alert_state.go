@@ -155,3 +155,17 @@ func decOptTime(v sql.NullInt64) *time.Time {
 	t := decTime(v.Int64)
 	return &t
 }
+
+// FailUndelivered implements alerting.Sweeper.
+func (s *Store) FailUndelivered(ctx context.Context, ops domain.OpsScope, reason string) (int, error) {
+	if _, err := ops.Reason(); err != nil {
+		return 0, err
+	}
+	res, err := s.db.Writer().ExecContext(ctx, `UPDATE alert_events SET outcome = 'failed', delivery = ?
+		WHERE notify = 1 AND outcome = ''`, reason)
+	if err != nil {
+		return 0, fmt.Errorf("sweep undelivered: %w", err)
+	}
+	n, err := res.RowsAffected()
+	return int(n), err
+}

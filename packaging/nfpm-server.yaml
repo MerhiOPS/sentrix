@@ -1,0 +1,26 @@
+# nfpm config for sentrix-server (.deb and .rpm). Built by scripts/package.sh.
+name: sentrix-server
+arch: ${GOARCH}
+platform: linux
+version: ${SENTRIX_VERSION}
+section: admin
+priority: optional
+maintainer: MerhiOPS <noreply@users.noreply.github.com>
+description: Sentrix server — lightweight server monitoring.
+homepage: https://github.com/MerhiOPS/sentrix
+license: Proprietary
+contents:
+  - src: dist/linux-${GOARCH}/sentrix-server
+    dst: /usr/bin/sentrix-server
+    file_info: { mode: 0755 }
+  - src: packaging/systemd/sentrix-server.service
+    dst: /lib/systemd/system/sentrix-server.service
+    file_info: { mode: 0644 }
+  - src: packaging/default/sentrix-server
+    dst: /etc/default/sentrix-server
+    type: config|noreplace
+    file_info: { mode: 0644 }
+scripts:
+  preinstall: packaging/scripts/server-preinstall.sh
+  postinstall: packaging/scripts/server-postinstall.sh
+  preremove: packaging/scripts/server-preremove.sh
