@@ -42,8 +42,12 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	return db, nil
 }
 
+// driverName is the database/sql driver used to open pools. Tests swap in a
+// recording wrapper to audit every statement the adapter issues.
+var driverName = "sqlite"
+
 func openPool(ctx context.Context, path string, role connRole, conns int) (*sql.DB, error) {
-	p, err := sql.Open("sqlite", dsn(path, role))
+	p, err := sql.Open(driverName, dsn(path, role))
 	if err != nil {
 		return nil, fmt.Errorf("open sqlite: %w", err)
 	}

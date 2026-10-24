@@ -56,8 +56,17 @@ func (s CoreSample) Validate() error {
 			return err
 		}
 	}
+	for _, c := range []uint64{s.MemoryUsed, s.UptimeSeconds, s.NetRxBytes, s.NetTxBytes, s.DiskReadBytes, s.DiskWriteBytes} {
+		if c > MaxCounter {
+			return fmt.Errorf("%w: counter value %d exceeds %d", ErrInvalid, c, uint64(MaxCounter))
+		}
+	}
 	return nil
 }
+
+// MaxCounter is the largest integer value storage can hold (signed 64-bit).
+// No real counter reaches it; a value above it is corrupt input.
+const MaxCounter = math.MaxInt64
 
 func checkGauge(name string, v, max float64) error {
 	if math.IsNaN(v) || math.IsInf(v, 0) {

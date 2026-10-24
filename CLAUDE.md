@@ -32,7 +32,8 @@ internal/
             imports domain only.
   infra/    adapters implementing ports. The only place drivers appear.
   wire/     agent<->server ingest types. stdlib only.
-  agent/    agent runtime. may import wire, infra/collector, infra/logtail.
+  agent/    agent runtime. may import wire, infra/collector, infra/logtail,
+            infra/tlscert (pinning).
 ```
 
 - Import direction is inward, always. `scripts/ci` fails the build otherwise.
