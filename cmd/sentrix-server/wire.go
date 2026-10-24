@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/app/alerting"
+	"github.com/MerhiOPS/sentrix/internal/app/export"
 	"github.com/MerhiOPS/sentrix/internal/app/identity"
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
@@ -74,6 +75,7 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
 		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub),
 		Plans:        identity.NewPlans(st, time.Now),
+		Export:       export.New(st, st, st, st),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,

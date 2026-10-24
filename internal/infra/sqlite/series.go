@@ -33,6 +33,15 @@ func (c *seriesCache) get(id seriesID) (int64, bool) {
 	return k, ok
 }
 
+// forgetAll empties the cache after an erasure: without AUTOINCREMENT a
+// deleted host's key can be reused, and a cached series must never map a
+// new host onto a deleted host's series key.
+func (c *seriesCache) forgetAll() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.keys = nil
+}
+
 func (c *seriesCache) merge(pending map[seriesID]int64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()

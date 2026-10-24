@@ -16,8 +16,9 @@ import (
 // writes are serialised and BEGIN IMMEDIATE never contends, and a read pool
 // that cannot write.
 type DB struct {
-	w *sql.DB
-	r *sql.DB
+	w    *sql.DB
+	r    *sql.DB
+	path string
 }
 
 // Open opens (creating if needed) the database at path and verifies that the
@@ -35,7 +36,7 @@ func Open(ctx context.Context, path string) (*DB, error) {
 	if err != nil {
 		return nil, errors.Join(err, w.Close())
 	}
-	db := &DB{w: w, r: r}
+	db := &DB{w: w, r: r, path: path}
 	if err := db.verify(ctx); err != nil {
 		return nil, errors.Join(err, db.Close())
 	}
@@ -89,6 +90,9 @@ func (db *DB) verify(ctx context.Context) error {
 
 // Writer returns the single-connection write pool.
 func (db *DB) Writer() *sql.DB { return db.w }
+
+// Path is the database file (its WAL is Path + "-wal").
+func (db *DB) Path() string { return db.path }
 
 // Reader returns the read-only pool.
 func (db *DB) Reader() *sql.DB { return db.r }

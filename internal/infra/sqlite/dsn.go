@@ -18,6 +18,9 @@ type connRole int
 const (
 	roleWriter connRole = iota
 	roleReader
+	// roleBackup is a one-off connection for VACUUM INTO: it only reads the
+	// database, but query_only refuses VACUUM even with an INTO target.
+	roleBackup
 )
 
 // dsn builds a modernc.org/sqlite DSN. Pragmas are per connection and

@@ -5,6 +5,84 @@ why. Newest first.
 
 ---
 
+## Phase 7 — Commercial-lite + compliance · 2026-10-24
+
+**Landed**
+- **Plans** per tenant: `max_hosts`, `log_bytes_per_day`,
+  `metrics_retention_days`, `logs_retention_days` (migration 0006,
+  `sentrix-server tenant plan`). Over `max_hosts` (enabled hosts) a new
+  enrollment is refused with the token left unused; existing hosts keep
+  reporting; disabling a host frees a slot. The janitor applies each
+  tenant's retention (`metrics_retention_days` caps every metric kind).
+- **Metering from the write path**, inside `CommitBatch` after the replay
+  gate: core samples stored, log bytes stored, and distinct hosts per day
+  (the monthly peak). Aggregates are per tenant, so erasing a host keeps the
+  billed totals but not the host. Nothing scans storage.
+- **Settings page** and `GET /api/v1/usage` (every role): hosts and today's
+  logs against their limits, warning from 80 %, plus the month's totals.
+- **Export**: `GET /api/v1/export?table=metrics|logs|alert_events&from&to
+  &format=csv|ndjson[&host]` (admin), streamed in bounded pages through the
+  same scoped readers as the dashboard. Table, format, range and host are
+  all validated before the first byte (OLD B12); a mid-stream failure ends
+  NDJSON with an error record (CSV just ends — documented).
+- **Erasure**: `sentrix-server erase host|user|tenant … --yes`: plant a
+  canary in the subject's own data (log line → search index, process
+  snapshot; a session; the tenant row and every host), delete with cascades,
+  FTS `optimize`, `incremental_vacuum`, `wal_checkpoint(TRUNCATE)` (refuses
+  if a reader blocks it), then **byte-scan the database and WAL** for the
+  canary, the subject's id, a host's credential hash, a user's email and
+  password hash. Every run is audited (`audit_log`, subject as SHA-256).
+  The series cache is reset after an erasure (a deleted host's key can be
+  reused without AUTOINCREMENT).
+- **Backup / restore**: `sentrix-server backup` (`VACUUM INTO` on its own
+  connection — the read pool's `query_only` refuses VACUUM even with INTO;
+  one read transaction, so ingest continues) and `restore` (into an empty
+  directory only; open + pragma verification + migrations +
+  `integrity_check`; a failure removes the file).
+- `docs/data-handling.md`, `docs/restore-drill.md`.
+
+**Acceptance**
+- restore reproduces a known dataset exactly — `TestRestoreReproducesDatasetExactly`
+  (row count + SHA-256 per table in key order, FTS shadow tables included) ✅
+- restored tables agree on the marker pairs — `TestBackupUnderConcurrentWritesIsCrossTableConsistent`
+  (backup taken while a writer committed sample+log marker pairs; last run 57 of 78 batches in the
+  snapshot, every pair intact) ✅
+- erasure post-check proven to fail when a row is left behind and when `secure_delete` is off —
+  `TestPostCheckFailsWhenARowIsLeftBehind`, `TestPostCheckFailsWithSecureDeleteOff` ✅; a clean erasure of
+  a host, user and tenant passes and touches no other host or tenant — `TestEraseHost…`, `TestEraseUserAndTenant` ✅
+- over `max_hosts`, a new enrollment is refused and existing hosts keep reporting —
+  `plans/max-hosts-new-only` on SQLite and memstore ✅
+
+**Measured** — timed restore drill (`docs/restore-drill.md`): 50 hosts × 2 h
+of realistic batches = 72 000 core samples, 1.3 M detail values, 180 000 log
+lines; database 73.2 MiB, backup 68.5 MiB in **0.22 s**, restore with full
+verification in **1.02 s**, identical digest in every table.
+
+**Mutation testing** — 23 mutations (host limit and its enabled-only count,
+metering amounts, first-host-of-the-day, the month window, tenant retention
+cap, export validation, host check, the NDJSON error record, export role,
+every erasure purge step, the WAL scan, the chunk overlap, the residue
+decision, the failed-audit outcome, the planted log canary, restore's
+overwrite refusal and integrity check). 21 killed after five tests were
+added for survivors (reversed range, a row only in the WAL, the log canary
+being searchable, a corrupt backup). **Two remain, and are reported, not
+hidden:**
+- Removing the FTS `optimize` from erasure is **not detected**. The index
+  stores 3-character terms with prefix compression, so the byte-scan cannot
+  see a deleted line's residue there, and FTS5's own views hide deleted
+  documents. `optimize` is required by §4.3 and kept; verifying it needs a
+  segment-level check that does not exist yet. Open.
+- Removing restore's "already holds a database" check survives because the
+  copy itself opens with `O_EXCL` — an equivalent mutant (two guards).
+
+**Deviations**
+- Metering counts core samples (not detail values): exact and cheap; detail
+  volume follows from host count.
+- Usage is visible to every role; plan changes are an operator CLI, not an
+  API (there is no operator role yet).
+
+---
+
 ## Phase 6 — Hardening + packaging · 2026-10-24
 
 **Landed**
