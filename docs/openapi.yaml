@@ -469,6 +469,17 @@ paths:
               schema: { $ref: "#/components/schemas/System" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
+  /usage:
+    get:
+      operationId: getUsage
+      description: The tenant's plan and its metered usage (today and this calendar month, UTC). Every role.
+      responses:
+        "200":
+          description: Plan and usage.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Usage" }
+        "401": { $ref: "#/components/responses/Error" }
 components:
   securitySchemes:
     session:
@@ -869,3 +880,24 @@ components:
             ws_dropped: { type: integer, description: Live frames dropped for slow subscribers. }
             writer_waits: { type: integer }
             writer_wait_ms: { type: integer }
+    Usage:
+      type: object
+      required: [plan, usage]
+      properties:
+        plan:
+          type: object
+          required: [max_hosts, log_bytes_per_day, metrics_retention_days, logs_retention_days]
+          properties:
+            max_hosts: { type: integer, description: Enabled hosts allowed; beyond it new enrollments are refused. }
+            log_bytes_per_day: { type: integer, format: int64 }
+            metrics_retention_days: { type: integer }
+            logs_retention_days: { type: integer }
+        usage:
+          type: object
+          required: [hosts, log_bytes_today, month_samples, month_log_bytes, month_peak_hosts]
+          properties:
+            hosts: { type: integer }
+            log_bytes_today: { type: integer, format: int64 }
+            month_samples: { type: integer, format: int64 }
+            month_log_bytes: { type: integer, format: int64 }
+            month_peak_hosts: { type: integer, description: Most distinct hosts reporting on one day this month. }

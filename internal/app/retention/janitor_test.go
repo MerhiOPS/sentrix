@@ -73,3 +73,33 @@ func TestJanitorSkipsKindsWithoutRetention(t *testing.T) {
 		t.Fatalf("deleted %d (%v) with %d prune calls: logs have no retention configured here", n, err, f.calls)
 	}
 }
+
+// A tenant's plan caps retention: with metrics_retention_days = 1 even the
+// hourly rollups go after a day.
+func TestJanitorAppliesTenantPlan(t *testing.T) {
+	tg := Target{Host: domain.NewHostID(), Plan: domain.Plan{MaxHosts: 1, MetricsRetentionDays: 1, LogsRetentionDays: 1}}
+	var cutoffs []time.Time
+	f := &recordingStore{fakeStore: fakeStore{targets: []Target{tg}, old: map[Target]map[domain.DataKind]int{tg: {}}}, cutoffs: &cutoffs}
+	j := New(f, domain.DefaultRetention, func() time.Time { return t0 })
+	if _, err := j.RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cutoffs {
+		if !c.Equal(t0.Add(-24 * time.Hour)) {
+			t.Fatalf("cutoff %v: every kind must be capped at the plan's one day", c)
+		}
+	}
+	if len(cutoffs) != len(domain.DataKinds) {
+		t.Fatalf("%d kinds pruned, want %d", len(cutoffs), len(domain.DataKinds))
+	}
+}
+
+type recordingStore struct {
+	fakeStore
+	cutoffs *[]time.Time
+}
+
+func (r *recordingStore) PruneHost(_ context.Context, _ domain.OpsScope, _ Target, _ domain.DataKind, before time.Time, _ int) (int, error) {
+	*r.cutoffs = append(*r.cutoffs, before)
+	return 0, nil
+}

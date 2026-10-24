@@ -4,7 +4,8 @@ export type Route =
   | { page: "fleet" }
   | { page: "host"; hostId: string; tab: string; range: string }
   | { page: "logs"; hostId: string | null; atMs: number | null }
-  | { page: "alerts" };
+  | { page: "alerts" }
+  | { page: "settings" };
 
 /** Parses "#/hosts/<id>?tab=cpu&range=6h" and friends. Pure, so testable. */
 export function parseRoute(hash: string): Route {
@@ -19,6 +20,7 @@ export function parseRoute(hash: string): Route {
     return { page: "logs", hostId: q.get("host"), atMs: Number.isFinite(at) && at > 0 ? at : null };
   }
   if (parts[0] === "alerts") return { page: "alerts" };
+  if (parts[0] === "settings") return { page: "settings" };
   return { page: "fleet" };
 }
 

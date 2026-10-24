@@ -38,3 +38,14 @@ func TestSystemReportIsAdminOnlyAndShaped(t *testing.T) {
 		t.Fatalf("system: %d %s", res.status, res.body)
 	}
 }
+
+func TestUsageShowsPlanAndMeteredUsage(t *testing.T) {
+	r := newRig(t)
+	r.ingestSamples(t, r.a, 1, time.Now(), time.Now().Add(-5*time.Second))
+	res := r.call(t, "GET", "/api/v1/usage", r.login(t, r.a.viewer), "")
+	var u usageDTO
+	_ = json.Unmarshal(res.body, &u)
+	if res.status != http.StatusOK || u.Plan.MaxHosts != 100 || u.Usage.Hosts != 1 || u.Usage.MonthSamples != 2 || u.Usage.MonthPeakHosts != 1 {
+		t.Fatalf("usage: %d %s", res.status, res.body)
+	}
+}

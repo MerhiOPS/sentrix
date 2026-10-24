@@ -11,6 +11,7 @@ describe("routes", () => {
   });
   it("parses the alerts page", () => {
     expect(parseRoute("#/alerts")).toEqual({ page: "alerts" });
+    expect(parseRoute("#/settings")).toEqual({ page: "settings" });
   });
   it("anything else is the fleet", () => {
     expect(parseRoute("")).toEqual({ page: "fleet" });

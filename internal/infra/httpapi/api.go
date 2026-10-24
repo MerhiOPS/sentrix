@@ -104,6 +104,7 @@ type Config struct {
 	HostAdmin HostAdmin
 	// Ready probes the database for /readyz; System reports server-wide
 	// figures for /api/v1/system. Either may be nil.
+	Plans  PlanReader
 	Ready  func(ctx context.Context) error
 	System func(ctx context.Context) (ServerStats, error)
 	Live   Live
@@ -143,6 +144,7 @@ func New(cfg Config) *API {
 	a.mux.HandleFunc("GET /healthz", a.handleHealthz)
 	a.mux.HandleFunc("GET /readyz", a.handleReadyz)
 	a.mux.HandleFunc("GET /api/v1/system", a.requireSession(admin, a.handleSystem))
+	a.mux.HandleFunc("GET /api/v1/usage", a.requireSession(viewer, a.handleUsage))
 	a.mux.HandleFunc("GET /api/v1/stream", a.requireSession(viewer, a.handleStream))
 	a.mux.HandleFunc("/api/", func(w http.ResponseWriter, _ *http.Request) {
 		writeJSON(w, http.StatusNotFound, errorBody{Error: "not found"})

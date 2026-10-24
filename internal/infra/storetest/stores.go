@@ -36,6 +36,7 @@ type Stores interface {
 	query.LogReader
 	redaction.RuleRepo
 	identity.HostRepo
+	identity.PlanRepo
 	alerting.RuleRepo
 	alerting.ChannelRepo
 	alerting.SilenceRepo

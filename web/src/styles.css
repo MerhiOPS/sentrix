@@ -77,3 +77,11 @@ label.inline { display: flex; flex-direction: row; gap: 6px; align-items: center
 .ok { color: var(--ok); }
 .detail-head button { margin-left: auto; }
 button.danger { background: #8a2f2f; }
+.settings { display: grid; gap: 16px; max-width: 720px; }
+.meter { margin: 10px 0; }
+.meter-head { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 4px; }
+.meter-bar { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; }
+.meter-fill { height: 100%; background: var(--ok); }
+.meter-fill.stale { background: var(--stale); }
+.meter-fill.error { background: var(--nodata); }
+.stale { color: var(--stale); }

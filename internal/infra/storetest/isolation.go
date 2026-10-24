@@ -35,6 +35,7 @@ var scopedPorts = []reflect.Type{
 	reflect.TypeFor[query.LogReader](),
 	reflect.TypeFor[redaction.RuleRepo](),
 	reflect.TypeFor[identity.HostRepo](),
+	reflect.TypeFor[identity.PlanRepo](),
 	reflect.TypeFor[alerting.RuleRepo](),
 	reflect.TypeFor[alerting.ChannelRepo](),
 	reflect.TypeFor[alerting.SilenceRepo](),
@@ -138,6 +139,9 @@ func CrossTenantProblems(ctx context.Context, t *testing.T, st Stores) []string 
 		}
 		if !ok {
 			c, ok = alertStateCrossCases[name]
+		}
+		if !ok {
+			c, ok = planCrossCases[name]
 		}
 		if !ok {
 			problems = append(problems, "no cross-tenant case for scoped method "+name)

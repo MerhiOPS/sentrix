@@ -42,6 +42,14 @@ func (s *Store) RedeemToken(ctx context.Context, secretHash []byte, now time.Tim
 	if err != nil {
 		return domain.Host{}, err
 	}
+	// Over max_hosts only new enrollments are refused; the rollback leaves
+	// the token unused, so it works once a slot frees up.
+	if full, err := hostsAtLimit(ctx, tx, tk); err != nil || full {
+		if err == nil {
+			err = fmt.Errorf("%w: the plan's host limit is reached", domain.ErrQuotaExceeded)
+		}
+		return domain.Host{}, err
+	}
 	h := nh.Host
 	res, err := tx.ExecContext(ctx, `INSERT INTO hosts
 		(tenant_key, id, name, os, platform, agent_version, interval_ms, created_at, credential_hash)

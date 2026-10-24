@@ -6,6 +6,7 @@ import { FleetGrid } from "./FleetGrid";
 import { HostDetailPage } from "./HostDetailPage";
 import { AlertsPage } from "./AlertsPage";
 import { LogsPage } from "./LogsPage";
+import { SettingsPage } from "./SettingsPage";
 import { TokenButton } from "./TokenButton";
 
 export function AppShell({ me }: { me: Me }) {
@@ -18,6 +19,7 @@ export function AppShell({ me }: { me: Me }) {
         <a href="#/" className="muted">Fleet</a>
         <a href="#/logs" className="muted">Logs</a>
         <a href="#/alerts" className="muted">Alerts</a>
+        <a href="#/settings" className="muted">Settings</a>
         <span className="muted">{me.email} · {me.role}</span>
         <button className="link" onClick={() => logoutM.mutate()}>Sign out</button>
       </header>
@@ -29,6 +31,7 @@ export function AppShell({ me }: { me: Me }) {
           </>
         )}
         {route.page === "host" && <HostDetailPage hostId={route.hostId} tab={route.tab} range={route.range} isAdmin={me.role === "admin"} />}
+        {route.page === "settings" && <SettingsPage />}
         {route.page === "alerts" && <AlertsPage isAdmin={me.role === "admin"} />}
         {route.page === "logs" && <LogsPage hostId={route.hostId} atMs={route.atMs} isAdmin={me.role === "admin"} />}
       </main>
