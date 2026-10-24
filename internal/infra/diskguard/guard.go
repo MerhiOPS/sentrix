@@ -4,6 +4,8 @@
 package diskguard
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -59,4 +61,20 @@ func (g *Guard) LogsAllowed() bool {
 	}
 	g.allowed = allowed
 	return allowed
+}
+
+// FreeRatio reads free/total now (for the system report).
+func (g *Guard) FreeRatio() (float64, error) {
+	free, total, err := g.usage(g.path)
+	if err != nil || total == 0 {
+		return 0, fmt.Errorf("read free space: %w", errors.Join(err, errNoTotal(total)))
+	}
+	return float64(free) / float64(total), nil
+}
+
+func errNoTotal(total uint64) error {
+	if total == 0 {
+		return errors.New("filesystem reports no size")
+	}
+	return nil
 }

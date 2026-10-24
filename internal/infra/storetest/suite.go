@@ -42,6 +42,7 @@ func Run(t *testing.T, newStores Factory) {
 		"alerts/silence-round-trip":         testAlertSilenceRoundTrip,
 		"alerts/tenant-buckets-match":       testTenantBucketsMatchRollups,
 		"hosts/disable-and-list-tenants":    testHostDisableAndList,
+		"retention/prunes-old-rows-of-kind": testRetentionPrunesOnlyOldRowsOfItsKind,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

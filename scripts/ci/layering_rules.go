@@ -26,7 +26,7 @@ var layers = []layer{
 		mayImport: []string{"internal/domain", "internal/app", "internal/infra"}},
 	{name: "agent", prefix: "internal/agent", thirdParty: true,
 		mayImport: []string{"internal/domain", "internal/agent", "internal/wire",
-			"internal/infra/collector", "internal/infra/logtail", "internal/infra/tlscert"}},
+			"internal/infra/collector", "internal/infra/logtail", "internal/infra/tlscert", "internal/buildinfo"}},
 }
 
 // layerFor returns the layer owning a module-relative directory, or nil for

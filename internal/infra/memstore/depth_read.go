@@ -25,7 +25,11 @@ func (s *Store) Rollups(_ context.Context, sc domain.Scope, id domain.HostID, re
 	}
 	w := res.Width()
 	buckets := map[int64]*query.RollupBucket{}
-	for _, smp := range h.samples {
+	src := h.rollup1m
+	if res == query.Res1h {
+		src = h.rollup1h
+	}
+	for _, smp := range src {
 		start := smp.TS.Truncate(w)
 		if start.Before(from) || !start.Before(to) {
 			continue

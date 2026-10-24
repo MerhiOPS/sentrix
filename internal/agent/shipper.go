@@ -15,30 +15,32 @@ import (
 // again, so re-enabling a host on the server resumes it without a restart.
 const stoppedRecheck = 5 * time.Minute
 
+// replayPace spaces requests while a backlog drains: 10 batches/s, well
+// under the server's per-host rate cap, so a reconnecting fleet does not
+// arrive as one burst.
+const replayPace = 100 * time.Millisecond
+
 // Shipper sends the buffer's head until it is acknowledged, in order. FIFO
 // is deliberate: the server folds counter resets in batch order.
 type Shipper struct {
 	client     *http.Client
 	endpoint   string
 	credential string
-	buf        *Buffer
+	buf        *WAL
 	backoff    *Backoff
 	log        *slog.Logger
 	now        func() time.Time
 	sleep      func(context.Context, time.Duration) bool
-	// settled is called when a batch leaves the buffer for good: acked, or
-	// refused as permanently invalid. Log positions advance only here.
-	settled func(Pending)
 
 	skewMS atomic.Int64
 }
 
 // NewShipper builds a shipper for one server identity.
-func NewShipper(c *http.Client, id Identity, buf *Buffer, log *slog.Logger) *Shipper {
+func NewShipper(c *http.Client, id Identity, buf *WAL, log *slog.Logger) *Shipper {
 	return &Shipper{
 		client: c, endpoint: id.ServerURL + wire.PathBatch, credential: id.Credential,
 		buf: buf, backoff: NewBackoff(time.Second, 5*time.Minute), log: log,
-		now: time.Now, sleep: sleepCtx, settled: func(Pending) {},
+		now: time.Now, sleep: sleepCtx,
 	}
 }
 
@@ -89,12 +91,13 @@ func (s *Shipper) handle(ctx context.Context, p Pending) time.Duration {
 	switch classify(resp.Status) {
 	case Acked:
 		s.acked(p, resp.Body)
-		s.settled(p)
 		s.backoff.Reset()
+		if s.buf.Len() > 0 {
+			return replayPace // a backlog is replayed at a bounded request rate
+		}
 		return 0
 	case Dropped:
-		s.buf.Discard(p.Seq)
-		s.settled(p) // a refused batch is never resent: its lines must not be re-read forever
+		s.buf.Discard(p.Seq) // never resent: replaying a refused head would block the queue forever
 		s.log.Error("server refused batch permanently; dropped", "seq", p.Seq,
 			"status", resp.Status, "reason", serverMessage(resp.Body))
 		return 0

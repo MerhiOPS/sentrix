@@ -48,7 +48,8 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 	svc := ingest.NewService(st, ingest.DefaultWindow, time.Now)
 	svc.SetPublisher(hub)
 	redactor := redact.New(st, ruleCacheTTL, time.Now)
-	svc.SetLogPipeline(redactor, diskguard.New(dataDir, minFreeForLogs, diskCheckEvery))
+	disk := diskguard.New(dataDir, minFreeForLogs, diskCheckEvery)
+	svc.SetLogPipeline(redactor, disk)
 	enroll := identity.NewEnrollment(st, time.Now)
 	auth := ingest.NewAuthenticator(st, authTTL, authCache, time.Now)
 	ingestH := ingesthttp.NewHandler(auth, svc, enroll)
@@ -65,11 +66,13 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 	} else if err != nil {
 		return handlers{}, err
 	}
+	janitor := startJanitor(ctx, st)
 	api := httpapi.New(httpapi.Config{
 		Sessions: sessions, Users: st, Tokens: enroll, Hosts: st,
 		Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, redactor),
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
+		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,

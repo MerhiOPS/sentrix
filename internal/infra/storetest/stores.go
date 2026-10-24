@@ -14,6 +14,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
 	"github.com/MerhiOPS/sentrix/internal/app/redaction"
+	"github.com/MerhiOPS/sentrix/internal/app/retention"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
@@ -41,6 +42,7 @@ type Stores interface {
 	alerting.StateRepo
 	alerting.BucketReader
 	alerting.TenantLister
+	retention.Store
 }
 
 // Factory builds a fresh, empty adapter for one test.

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -15,11 +16,15 @@ const identityFile = "identity.json"
 var ErrNotEnrolled = errors.New("agent is not enrolled: run `sentrix-agent enroll` first")
 
 // Identity is what enrollment produces and every batch uses. It holds the
-// credential, so it is written 0600 (Windows DPAPI protection is Phase 6).
+// credential: written 0600, and on Windows DPAPI-encrypted under the service
+// account the first time the service loads it (ProtectIdentity).
 type Identity struct {
 	ServerURL  string `json:"server_url"`
-	Credential string `json:"credential"`
-	HostID     string `json:"host_id"`
+	Credential string `json:"credential,omitempty"`
+	// Protected is the DPAPI-encrypted credential (base64); when set,
+	// Credential is empty on disk.
+	Protected string `json:"credential_protected,omitempty"`
+	HostID    string `json:"host_id"`
 	// PinHex is the server's SPKI pin. Empty means the server uses a
 	// CA-issued certificate and system roots are used instead.
 	PinHex string `json:"pin,omitempty"`
@@ -59,6 +64,17 @@ func LoadIdentity(dir string) (Identity, error) {
 	if err := json.Unmarshal(b, &id); err != nil {
 		return Identity{}, fmt.Errorf("decode identity: %w", err)
 	}
+	if id.Protected != "" {
+		blob, err := base64.StdEncoding.DecodeString(id.Protected)
+		if err != nil {
+			return Identity{}, fmt.Errorf("decode protected credential: %w", err)
+		}
+		plain, err := unprotectSecret(blob)
+		if err != nil {
+			return Identity{}, err
+		}
+		id.Credential, id.Protected = string(plain), ""
+	}
 	if id.ServerURL == "" || id.Credential == "" {
 		return Identity{}, errors.New("identity is incomplete: re-enroll")
 	}
@@ -66,4 +82,32 @@ func LoadIdentity(dir string) (Identity, error) {
 		return Identity{}, err
 	}
 	return id, nil
+}
+
+// ProtectIdentity rewrites a plaintext identity with the credential
+// DPAPI-encrypted under the calling account. Only the service calls it, on
+// its first start: protecting at enrollment would bind the credential to the
+// administrator who ran enroll, and the service account could never read it.
+// It reports whether it changed anything; on Unix it never does.
+func ProtectIdentity(dir string) (bool, error) {
+	if !protectionAvailable {
+		return false, nil
+	}
+	b, err := os.ReadFile(filepath.Join(dir, identityFile)) //nolint:gosec // dir is the operator-configured state directory
+	if err != nil {
+		return false, fmt.Errorf("read identity: %w", err)
+	}
+	var id Identity
+	if err := json.Unmarshal(b, &id); err != nil {
+		return false, fmt.Errorf("decode identity: %w", err)
+	}
+	if id.Protected != "" || id.Credential == "" {
+		return false, nil
+	}
+	blob, err := protectSecret([]byte(id.Credential))
+	if err != nil {
+		return false, err
+	}
+	id.Protected, id.Credential = base64.StdEncoding.EncodeToString(blob), ""
+	return true, SaveIdentity(dir, id)
 }
