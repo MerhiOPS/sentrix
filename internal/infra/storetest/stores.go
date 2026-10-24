@@ -27,6 +27,9 @@ type Stores interface {
 	query.HostReader
 	query.CoreReader
 	query.LatestReader
+	query.RollupReader
+	query.DetailReader
+	query.ProcessReader
 }
 
 // Factory builds a fresh, empty adapter for one test.

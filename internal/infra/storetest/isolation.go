@@ -27,6 +27,9 @@ var scopedPorts = []reflect.Type{
 	reflect.TypeFor[query.HostReader](),
 	reflect.TypeFor[query.CoreReader](),
 	reflect.TypeFor[query.LatestReader](),
+	reflect.TypeFor[query.RollupReader](),
+	reflect.TypeFor[query.DetailReader](),
+	reflect.TypeFor[query.ProcessReader](),
 }
 
 // crossCase calls one method as tenant B against tenant A's data and returns
@@ -113,6 +116,9 @@ func CrossTenantProblems(ctx context.Context, t *testing.T, st Stores) []string 
 		c, ok := crossCases[name]
 		if !ok {
 			c, ok = userCrossCases[name]
+		}
+		if !ok {
+			c, ok = depthCrossCases[name]
 		}
 		if !ok {
 			problems = append(problems, "no cross-tenant case for scoped method "+name)

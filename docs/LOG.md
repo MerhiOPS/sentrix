@@ -5,6 +5,74 @@ why. Newest first.
 
 ---
 
+## Phase 3 — Depth · 2026-10-24
+
+**Landed**
+- Detail metrics from a closed catalog (per-core CPU, per-mount usage,
+  per-device disk bytes, per-NIC network bytes): unknown metrics, wrong kinds
+  and wrong labels are refused at ingest. Values stored at a per-metric
+  fixed-point scale (×100 percent, ×1 bytes).
+- Detail counters get the same reset folding as core counters, keyed
+  `d:<metric>:<labels-hash>` in `host_counters`, in the same transaction.
+- Series resolution with a per-tenant ceiling (`tenants.series_limit`,
+  default 10 000): new series past the ceiling are refused and counted;
+  existing series are never blocked and the batch never fails (OLD A-C1).
+  The series cache is filled **only after commit** (R1).
+- Process snapshots every 30 s: union of top 20 by CPU and top 20 by RSS,
+  names only; CPU measured over the interval, not since process start.
+- Core rollups (1m, 1h) maintained inside the batch transaction from rows
+  actually inserted: gauges sum/min/max/n, counters first/last with
+  first_ts/last_ts.
+- Query: automatic step (~300 points), source chosen by step — raw, 1m or
+  1h — and reported in every frame; rates divide by the covered span
+  (OLD B5); NaN → null gaps. Detail-series frames with the same rules.
+- API: `/hosts/{id}/series`, `/series/{sid}/metrics`, `/processes`, all in
+  `openapi.yaml` and spec-validated in tests; a series id only resolves with
+  its own host and tenant.
+- Dashboard: host page with CPU / Memory / Disk / Network / Processes tabs,
+  range picker 1h–30d, per-series small multiples (natural sort), process
+  table; clicking a chart opens `#/logs?host&at` (page arrives in Phase 4).
+
+**Acceptance**
+- counter reset gives no negative or spiked rate — `TestCounterResetNeverGivesNegativeRate`,
+  `TestDetailCountersFoldPerSeriesAcrossReboot` ✅
+- rate over a bucket with an interior gap divides by covered span — `TestRateDividesByCoveredSpan`,
+  `TestRateFromRollupsUsesEdgesAcrossBuckets`, `TestDetailFrameGaugeMeanAndCounterRate` ✅
+- 30-day chart reads from the 1h rollup — `TestSourceFollowsWindow` (asserts the 1h read),
+  `TestThirtyDayChartReadsHourlyRollup` (API reports `source: 1h`), manual run ✅
+- `{"core":"3"}` and `{ "core" : "3" }` are one series — `TestLabelSpellingIsOneSeries` ✅
+- series ceiling does not block existing series or fail the batch — `depth/series-ceiling` ✅
+- plus: rollups equal an aggregation of raw, with a conflicting duplicate in
+  the input — `depth/rollups-equal-raw`, run against SQLite (incremental
+  upserts) **and** memstore (aggregates raw at read time).
+
+**Bugs caught by the tests before they shipped**
+- Rollup-path rates used a stale "last" value (84.6 B/s instead of 100): the
+  bucket's first edge moved `lastTS` without its values. Fixed by recording
+  both edges in one call.
+- Mutation-proven guards: rollups counting conflicts, the first/last CASE
+  inverted, the series cache filled before commit (produced exactly the
+  predicted stale-key FOREIGN KEY failure), the ceiling ignored.
+
+**Observed in the manual run** (real collectors, 2 s interval, ~4 min)
+- Every 1m bucket's `n` equals its raw row count; a 20 s two-core burn shows
+  as a 72 % peak; a 600 MiB fsync'd write as 4.8 MiB/s on nvme0n1;
+  16 per-core series, 3 mounts, 2 devices, 2 NICs; 30 processes per snapshot;
+  zero rejected, conflicting or dropped.
+
+**Deviations**
+- Omitting `step` now means automatic (~300 points), not "natural
+  resolution". OLD B8's concern (unbounded results without `step`) holds by
+  construction; an explicit too-fine step is still refused.
+- Series labels are stored as a JSON object (deterministic key order);
+  the canonical string is used only for hashing.
+
+**Deferred**
+- Detail-series retention (short raw retention) — with the retention
+  janitor and plans in Phase 7.
+
+---
+
 ## Phase 2 — Read path + dashboard shell · 2026-10-24
 
 **Landed**

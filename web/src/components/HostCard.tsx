@@ -1,6 +1,7 @@
 import type { Host } from "../api/endpoints";
 import { formatAge, formatBytes, formatPercent } from "../lib/format";
 import type { TimeBuffer } from "../lib/ringbuffer";
+import { hostHref } from "../hooks/useRoute";
 import { liveStatus } from "../lib/status";
 import { LiveChart } from "./LiveChart";
 import { StatusBadge } from "./StatusBadge";
@@ -24,7 +25,7 @@ export function HostCard({ host, buffer, version, now }: {
   return (
     <article className="card host">
       <header>
-        <h2 title={host.platform}>{host.name}</h2>
+        <h2 title={host.platform}><a href={hostHref(host.id)}>{host.name}</a></h2>
         <StatusBadge status={status} />
       </header>
       <dl className="stats">

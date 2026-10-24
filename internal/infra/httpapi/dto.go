@@ -65,6 +65,7 @@ type frameDTO struct {
 	From   time.Time             `json:"from"`
 	To     time.Time             `json:"to"`
 	StepS  int64                 `json:"step_s"`
+	Source string                `json:"source"`
 	TSMS   []int64               `json:"ts_ms"`
 	Series map[string][]*float64 `json:"series"`
 }
@@ -116,19 +117,24 @@ func toHost(h domain.Host, latest *domain.CoreSample, now time.Time) hostDTO {
 
 // toFrame renders NaN (no data) as JSON null, so charts draw a gap.
 func toFrame(f query.Frame) frameDTO {
-	out := frameDTO{From: f.From, To: f.To, StepS: int64(f.Step / time.Second),
+	out := frameDTO{From: f.From, To: f.To, StepS: int64(f.Step / time.Second), Source: string(f.Source),
 		TSMS: make([]int64, len(f.TS)), Series: map[string][]*float64{}}
 	for i, t := range f.TS {
 		out.TSMS[i] = t.UnixMilli()
 	}
 	for g, col := range f.Series {
-		vals := make([]*float64, len(col))
-		for i, v := range col {
-			if !math.IsNaN(v) {
-				vals[i] = &col[i]
-			}
-		}
-		out.Series[string(g)] = vals
+		out.Series[string(g)] = nullable(col)
 	}
 	return out
+}
+
+// nullable renders NaN (no data) as JSON null.
+func nullable(col []float64) []*float64 {
+	vals := make([]*float64, len(col))
+	for i, v := range col {
+		if !math.IsNaN(v) && !math.IsInf(v, 0) {
+			vals[i] = &col[i]
+		}
+	}
+	return vals
 }

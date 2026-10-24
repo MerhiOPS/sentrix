@@ -17,7 +17,32 @@ type Batch struct {
 	BatchSeq   uint64     `json:"batch_seq"`
 	IntervalMS int64      `json:"interval_ms"`
 	Samples    []Sample   `json:"samples"`
+	Details    []Detail   `json:"details,omitempty"`   // Phase 3; absent from older agents
+	Processes  []Snapshot `json:"processes,omitempty"` // Phase 3
 	Agent      AgentStats `json:"agent"`
+}
+
+// Detail is one value of a per-core / per-mount / per-device / per-NIC
+// series. Counters are raw, like core counters.
+type Detail struct {
+	TSMS   int64             `json:"ts_ms"`
+	Metric string            `json:"metric"`
+	Kind   string            `json:"kind"`
+	Labels map[string]string `json:"labels"`
+	Value  float64           `json:"value"`
+}
+
+// Snapshot is a top-N process list. Names only — never command lines.
+type Snapshot struct {
+	TSMS  int64     `json:"ts_ms"`
+	Procs []Process `json:"procs"`
+}
+
+// Process is one snapshot entry.
+type Process struct {
+	Name string  `json:"name"`
+	CPU  float64 `json:"cpu"`
+	RSS  uint64  `json:"rss"`
 }
 
 // Sample is one CoreSample on the wire. Gauges are float64; counters are the

@@ -34,18 +34,29 @@ func loadCounters(ctx context.Context, tx *sql.Tx, tk, hk int64) (ingest.Counter
 }
 
 // writePrepared writes everything a batch produces except its seq record.
-func writePrepared(ctx context.Context, tx *sql.Tx, tk, hk int64, p ingest.Prepared) (ingest.CommitResult, error) {
+// Only samples actually inserted reach the rollups: a conflicting duplicate
+// is counted, never aggregated twice.
+func writePrepared(ctx context.Context, tx *sql.Tx, tk, hk int64, p ingest.Prepared, sr *seriesResolver) (ingest.CommitResult, error) {
 	var res ingest.CommitResult
 	for _, smp := range p.Samples {
 		inserted, err := insertCore(ctx, tx, `INSERT OR IGNORE INTO metrics_core`, tk, hk, smp)
 		if err != nil {
 			return res, err
 		}
-		if inserted {
-			res.Stored++
-		} else {
+		if !inserted {
 			res.Conflicts++
+			continue
 		}
+		res.Stored++
+		if err := rollupSample(ctx, tx, tk, hk, smp); err != nil {
+			return res, err
+		}
+	}
+	if err := writeDetails(ctx, sr, p.Details, &res); err != nil {
+		return res, err
+	}
+	if err := writeSnapshots(ctx, tx, tk, hk, p.Processes, &res); err != nil {
+		return res, err
 	}
 	if n := len(p.Samples); n > 0 {
 		if err := upsertLatest(ctx, tx, tk, hk, p.Samples[n-1]); err != nil {

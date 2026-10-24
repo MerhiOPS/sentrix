@@ -57,7 +57,7 @@ func build(ctx context.Context, st *sqlite.Store, pin []byte, extraOrigins []str
 	}
 	api := httpapi.New(httpapi.Config{
 		Sessions: sessions, Users: st, Tokens: enroll, Hosts: st,
-		Series: query.NewMetrics(st, st), Live: hub,
+		Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: hub,
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,

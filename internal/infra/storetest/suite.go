@@ -27,6 +27,11 @@ func Run(t *testing.T, newStores Factory) {
 		"users/email-unique-across-tenants": testUserEmailUniqueAcrossTenants,
 		"users/find-login":                  testFindLoginReturnsTenantAndHash,
 		"sessions/lifecycle":                testSessionLifecycle,
+		"depth/rollups-equal-raw":           testRollupsEqualAggregationOfRaw,
+		"depth/detail-series-precision":     testDetailSeriesAndPrecision,
+		"depth/series-ceiling":              testSeriesCeilingRefusesOnlyNewSeries,
+		"depth/series-cache-rollback":       testSeriesCreatedInRolledBackBatchIsNotCached,
+		"depth/processes-at":                testProcessesAtReturnsNewestNotAfter,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

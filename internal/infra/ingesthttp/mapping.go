@@ -32,6 +32,19 @@ func toBatch(b wire.Batch) ingest.Batch {
 			DiskReadBytes: s.DiskReadBytes, DiskWriteBytes: s.DiskWriteBytes,
 		})
 	}
+	for _, d := range b.Details {
+		out.Details = append(out.Details, domain.DetailSample{
+			TS: time.UnixMilli(d.TSMS).UTC(), Metric: d.Metric, Kind: domain.MetricKind(d.Kind),
+			Labels: domain.Labels(d.Labels), Value: d.Value,
+		})
+	}
+	for _, s := range b.Processes {
+		snap := domain.ProcessSnapshot{TS: time.UnixMilli(s.TSMS).UTC(), Procs: make([]domain.Process, len(s.Procs))}
+		for i, p := range s.Procs {
+			snap.Procs[i] = domain.Process{Name: p.Name, CPUPercent: p.CPU, RSS: p.RSS}
+		}
+		out.Processes = append(out.Processes, snap)
+	}
 	return out
 }
 

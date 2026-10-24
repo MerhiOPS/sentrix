@@ -62,7 +62,7 @@ func newRig(t *testing.T) *rig {
 	r.b = seedTenant(t, st, hasher, "b")
 	api := New(Config{
 		Sessions: sessions, Users: st, Tokens: identity.NewEnrollment(st, time.Now),
-		Hosts: st, Series: query.NewMetrics(st, st), Live: r.hub,
+		Hosts: st, Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: r.hub,
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})
 	r.srv = httptest.NewServer(api)

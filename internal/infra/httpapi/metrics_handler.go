@@ -36,26 +36,41 @@ func (a *API) handleMetrics(w http.ResponseWriter, r *http.Request) {
 }
 
 func parseSeries(r *http.Request, host domain.HostID) (query.SeriesRequest, error) {
-	q := r.URL.Query()
-	req := query.SeriesRequest{Host: host}
-	for _, g := range strings.Split(q.Get("gauges"), ",") {
+	rg, err := parseRange(r)
+	if err != nil {
+		return query.SeriesRequest{}, err
+	}
+	req := query.SeriesRequest{Host: host, From: rg.from, To: rg.to, Step: rg.step}
+	for _, g := range strings.Split(r.URL.Query().Get("gauges"), ",") {
 		if g = strings.TrimSpace(g); g != "" {
 			req.Gauges = append(req.Gauges, query.Gauge(g))
 		}
 	}
+	return req, nil
+}
+
+type timeRange struct {
+	from, to time.Time
+	step     time.Duration
+}
+
+// parseRange reads from, to (RFC 3339) and the optional step in seconds.
+func parseRange(r *http.Request) (timeRange, error) {
+	q := r.URL.Query()
+	var rg timeRange
 	var err error
-	if req.From, err = time.Parse(time.RFC3339, q.Get("from")); err != nil {
-		return req, fmt.Errorf("%w: from must be RFC 3339", domain.ErrInvalid)
+	if rg.from, err = time.Parse(time.RFC3339, q.Get("from")); err != nil {
+		return rg, fmt.Errorf("%w: from must be RFC 3339", domain.ErrInvalid)
 	}
-	if req.To, err = time.Parse(time.RFC3339, q.Get("to")); err != nil {
-		return req, fmt.Errorf("%w: to must be RFC 3339", domain.ErrInvalid)
+	if rg.to, err = time.Parse(time.RFC3339, q.Get("to")); err != nil {
+		return rg, fmt.Errorf("%w: to must be RFC 3339", domain.ErrInvalid)
 	}
 	if s := q.Get("step"); s != "" {
 		n, err := strconv.Atoi(s)
 		if err != nil || n < 1 || n > 86400*31 {
-			return req, fmt.Errorf("%w: step must be 1..2678400 seconds", domain.ErrInvalid)
+			return rg, fmt.Errorf("%w: step must be 1..2678400 seconds", domain.ErrInvalid)
 		}
-		req.Step = time.Duration(n) * time.Second
+		rg.step = time.Duration(n) * time.Second
 	}
-	return req, nil
+	return rg, nil
 }

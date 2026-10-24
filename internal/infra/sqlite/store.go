@@ -11,7 +11,8 @@ import (
 // Store implements the application ports on SQLite. Writes go through the
 // single writer connection; reads through the query_only pool.
 type Store struct {
-	db *DB
+	db     *DB
+	series seriesCache
 }
 
 // NewStore wraps an opened, migrated database.

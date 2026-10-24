@@ -10,23 +10,30 @@ import (
 
 // Batch is a decoded batch, already mapped from the wire format.
 type Batch struct {
-	Seq      uint64
-	Interval time.Duration // as reported by the agent; zero = use the host's
-	Samples  []domain.CoreSample
-	Agent    AgentStats
+	Seq       uint64
+	Interval  time.Duration // as reported by the agent; zero = use the host's
+	Samples   []domain.CoreSample
+	Details   []domain.DetailSample
+	Processes []domain.ProcessSnapshot
+	Agent     AgentStats
 }
 
-// MaxSamples caps samples per batch (OLD A-M5). The transport enforces the
-// same number; the use case does not trust that it did.
-const MaxSamples = 1000
+// Per-batch caps (OLD A-M5). The transport enforces the same numbers; the
+// use case does not trust that it did.
+const (
+	MaxSamples   = 1000
+	MaxDetails   = 20000
+	MaxSnapshots = 200
+)
 
 // Result is what the agent is told.
 type Result struct {
-	Replayed  bool
-	Stored    int
-	Rejected  int
-	Conflicts int
-	ServerNow time.Time
+	Replayed      bool
+	Stored        int
+	Rejected      int
+	Conflicts     int
+	SeriesRefused int
+	ServerNow     time.Time
 }
 
 // Service ingests batches.
@@ -55,8 +62,8 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	if b.Seq == 0 || b.Seq > domain.MaxCounter {
 		return Result{}, fmt.Errorf("%w: batch_seq must be in [1, 2^63)", domain.ErrInvalid)
 	}
-	if len(b.Samples) > MaxSamples {
-		return Result{}, fmt.Errorf("%w: %d samples, max %d", domain.ErrInvalid, len(b.Samples), MaxSamples)
+	if len(b.Samples) > MaxSamples || len(b.Details) > MaxDetails || len(b.Processes) > MaxSnapshots {
+		return Result{}, fmt.Errorf("%w: batch over size limits", domain.ErrInvalid)
 	}
 	scope, err := domain.NewScope(ah.Tenant)
 	if err != nil {
@@ -68,13 +75,17 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	}
 	now := s.now().UTC()
 	samples, rejected := normalize(b.Samples, interval, s.window, now)
+	details, rejDetails := normalizeDetails(b.Details, interval, s.window, now)
+	snaps, rejSnaps := normalizeSnapshots(b.Processes, s.window, now)
+	rejected += rejDetails + rejSnaps
 
 	var stored []domain.CoreSample
 	build := func(state CounterState) (Prepared, error) {
 		folded, next := foldCounters(state, samples)
+		foldedDetails, next := foldDetailCounters(next, details)
 		stored = folded
 		return Prepared{
-			Samples: folded, Counters: next, Rejected: rejected,
+			Samples: folded, Details: foldedDetails, Processes: snaps, Counters: next, Rejected: rejected,
 			Interval: interval, Agent: b.Agent, ReceivedAt: now,
 			SeqRetention: s.window.SeqRetention(),
 		}, nil
@@ -86,7 +97,8 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	if s.pub != nil && !cr.Replayed && len(stored) > 0 {
 		s.pub.PublishCore(ah.Tenant, ah.Host, stored) // after commit, never before
 	}
-	res := Result{Replayed: cr.Replayed, Stored: cr.Stored, Conflicts: cr.Conflicts, ServerNow: now}
+	res := Result{Replayed: cr.Replayed, Stored: cr.Stored, Conflicts: cr.Conflicts,
+		SeriesRefused: cr.SeriesRefused, ServerNow: now}
 	if !cr.Replayed {
 		res.Rejected = rejected
 	}

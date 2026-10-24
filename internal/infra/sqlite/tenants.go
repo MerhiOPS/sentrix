@@ -44,3 +44,22 @@ func (s *Store) GetTenant(ctx context.Context, sc domain.Scope) (domain.Tenant, 
 	}
 	return domain.Tenant{ID: tid, Name: name, CreatedAt: decTime(created)}, nil
 }
+
+// SetSeriesLimit implements identity.TenantRepo.
+func (s *Store) SetSeriesLimit(ctx context.Context, ops domain.OpsScope, t domain.TenantID, limit int) error {
+	if _, err := ops.Reason(); err != nil {
+		return err
+	}
+	if limit < 0 {
+		return fmt.Errorf("%w: series limit must be >= 0", domain.ErrInvalid)
+	}
+	res, err := s.db.Writer().ExecContext(ctx, `UPDATE tenants SET series_limit = ? WHERE id = ?`,
+		limit, encID(domain.ID(t)))
+	if err != nil {
+		return fmt.Errorf("set series limit: %w", err)
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return fmt.Errorf("tenant: %w", domain.ErrNotFound)
+	}
+	return nil
+}

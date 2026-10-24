@@ -22,6 +22,9 @@ type Store struct {
 	hosts    map[domain.HostID]*host
 	users    map[domain.UserID]*user
 	sessions map[string]*session // by token hash
+	limits   map[domain.TenantID]int
+	// nextSeries numbers series across the store, like an INTEGER PRIMARY KEY.
+	nextSeries int64
 }
 
 type token struct {
@@ -37,6 +40,8 @@ type host struct {
 	counters ingest.CounterState
 	samples  map[int64]domain.CoreSample // by ts unix ms
 	latest   *domain.CoreSample
+	series   map[string]*mseries // by metric|labels hash
+	snaps    map[int64]domain.ProcessSnapshot
 }
 
 // New returns an empty store.
@@ -47,6 +52,7 @@ func New() *Store {
 		hosts:    map[domain.HostID]*host{},
 		users:    map[domain.UserID]*user{},
 		sessions: map[string]*session{},
+		limits:   map[domain.TenantID]int{},
 	}
 }
 
@@ -61,6 +67,23 @@ func (s *Store) CreateTenant(_ context.Context, ops domain.OpsScope, t domain.Te
 		return fmt.Errorf("tenant %s: %w", t.ID, domain.ErrConflict)
 	}
 	s.tenants[t.ID] = t
+	return nil
+}
+
+// SetSeriesLimit implements identity.TenantRepo.
+func (s *Store) SetSeriesLimit(_ context.Context, ops domain.OpsScope, t domain.TenantID, limit int) error {
+	if _, err := ops.Reason(); err != nil {
+		return err
+	}
+	if limit < 0 {
+		return fmt.Errorf("%w: series limit must be >= 0", domain.ErrInvalid)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.tenants[t]; !ok {
+		return fmt.Errorf("tenant: %w", domain.ErrNotFound)
+	}
+	s.limits[t] = limit
 	return nil
 }
 
