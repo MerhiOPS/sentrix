@@ -27,6 +27,7 @@ func TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter(t *testing.T) {
 	mustExec(t, w, `CREATE TABLE b (marker INTEGER PRIMARY KEY)`)
 
 	var stop atomic.Bool
+	var written atomic.Int64
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
@@ -36,12 +37,18 @@ func TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter(t *testing.T) {
 				t.Errorf("writer: %v", err)
 				return
 			}
+			written.Store(int64(i))
 		}
 	}()
 
-	backups := 0
-	deadline := time.Now().Add(400 * time.Millisecond)
-	for ; time.Now().Before(deadline); backups++ {
+	// Count backups, not wall time: a slow runner (Windows CI) may fit only
+	// one backup into a fixed window. Run until at least minBackups were
+	// taken with the writer advancing between them, capped for safety.
+	const minBackups = 3
+	backups, overlapped := 0, 0
+	start := time.Now()
+	for (backups < minBackups || time.Since(start) < 400*time.Millisecond) && time.Since(start) < 15*time.Second {
+		before := written.Load()
 		out := filepath.Join(dir, fmt.Sprintf("backup-%d.db", backups))
 		// The read pool is query_only; VACUUM INTO writes a new file, so it
 		// runs on its own plain connection to the live database.
@@ -49,11 +56,15 @@ func TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertPairsMatch(t, out)
+		backups++
+		if written.Load() > before {
+			overlapped++ // the writer committed while this backup ran
+		}
 	}
 	stop.Store(true)
 	wg.Wait()
-	if backups < 2 {
-		t.Fatalf("only %d backups taken; the test did not exercise concurrency", backups)
+	if backups < minBackups || overlapped < 2 {
+		t.Fatalf("%d backups, %d overlapping a write: the test did not exercise concurrency", backups, overlapped)
 	}
 }
 
