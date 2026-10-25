@@ -18,7 +18,7 @@ var exemptSuffixes = []string{
 	".test.ts", ".test.tsx", ".gen.ts", ".d.ts",
 }
 
-// checkLines enforces the 300-line limit from CLAUDE.md.
+// checkLines enforces the 300-line limit from CONTRIBUTING.md.
 func checkLines(root string) ([]Violation, error) {
 	var vs []Violation
 	err := walkFiles(root, lineExts, func(abs, rel string) error {

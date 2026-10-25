@@ -12,7 +12,7 @@ type layer struct {
 }
 
 // layers is ordered most-specific first: the first matching prefix wins.
-// It encodes CLAUDE.md §3 and PLAN.md §3 rule 3.
+// It encodes CONTRIBUTING.md §3 and PLAN.md §3 rule 3.
 var layers = []layer{
 	{name: "domain", prefix: "internal/domain",
 		mayImport: []string{"internal/domain"}},

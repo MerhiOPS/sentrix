@@ -149,7 +149,7 @@ Windows Event Log are read by exec'ing `journalctl -o json` and `wevtutil`, as
 OLD did — both libsystemd and EvtSubscribe bindings would need cgo or a large
 syscall layer.
 
-Carried over from OLD's `CLAUDE.md`, enforced by `go run ./scripts/ci all`:
+Carried over from OLD's conventions file, enforced by `go run ./scripts/ci all`:
 1. **300 lines per file** (`.go .ts .tsx .sql`; generated code and `_test.go`
    exempt).
 2. **SRP** — one collector per subsystem, one reason to change per file.
@@ -316,7 +316,7 @@ Each phase ends with: CI green, acceptance criteria checked, a short entry in
 failing before the code that makes it pass (R2).
 
 ### Phase 0 — Skeleton (S)
-- Go module `github.com/MerhiOPS/sentrix`, layout above, `CLAUDE.md`.
+- Go module `github.com/MerhiOPS/sentrix`, layout above, `CONTRIBUTING.md`.
 - `scripts/ci`: line limit, layering, raw-SQL checks — each with a test that
   proves it fails on a violating fixture (R2).
 - Domain types: `TenantID`, `HostID`, `Scope`, `Host`, `CoreSample`,

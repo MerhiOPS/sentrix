@@ -1,7 +1,8 @@
-# Sentrix — Repo Conventions
+# Contributing to Sentrix
 
-Read `docs/PLAN.md` before making architectural changes. Progress per phase is
-in `docs/LOG.md`.
+These are the rules the code is written to. Most are enforced by
+`go run ./scripts/ci all` in CI, not by review. Read `docs/PLAN.md` before
+making architectural changes; progress per phase is in `docs/LOG.md`.
 
 ## Repo hygiene — non-negotiable
 
