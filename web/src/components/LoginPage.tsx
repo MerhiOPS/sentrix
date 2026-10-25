@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ApiError } from "../api/client";
 import { useLogin } from "../hooks/useSession";
 import { productName } from "../lib/brand";
+import { BrandMark } from "./BrandMark";
 
 export function LoginPage() {
   const [email, setEmail] = useState("");
@@ -21,8 +22,9 @@ export function LoginPage() {
 
   return (
     <main className="login">
-      <form onSubmit={submit} className="card">
-        <h1>{productName}</h1>
+      <form onSubmit={submit} className="card enter">
+        <h1><BrandMark />{productName}</h1>
+        <p className="muted small" style={{ margin: "-8px 0 4px" }}>Sign in to your fleet</p>
         <label>
           Email
           <input type="email" autoComplete="username" value={email} onChange={(e) => setEmail(e.target.value)} required />

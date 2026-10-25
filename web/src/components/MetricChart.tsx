@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
+import { CHROME } from "../lib/palette";
 import { formatUnit, type Unit } from "../lib/units";
 
 export interface ChartSeries {
@@ -9,20 +10,23 @@ export interface ChartSeries {
   color: string;
 }
 
-const PALETTE = ["#4f8cff", "#f2a33a", "#3ccf8e", "#c678dd", "#ef5b5b", "#56b6c2"];
-export const colorAt = (i: number) => PALETTE[i % PALETTE.length]!;
+const axis = (extra: Partial<uPlot.Axis> = {}): uPlot.Axis => ({
+  stroke: CHROME.muted, font: CHROME.font, grid: { stroke: CHROME.grid, width: 1 },
+  ticks: { stroke: CHROME.axis, width: 1, size: 4 }, ...extra,
+});
 
 /**
  * A time-series chart. Null values draw gaps (never zero). Clicking the plot
  * reports the timestamp under the cursor via onPick.
  */
-export function MetricChart({ title, xsMs, series, unit, onPick, height = 180 }: {
+export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, index = 0 }: {
   title: string;
   xsMs: number[];
   series: ChartSeries[];
   unit: Unit;
   onPick?: (tsMs: number) => void;
   height?: number;
+  index?: number; // position in a grid, for the staggered entrance
 }) {
   const el = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
@@ -37,13 +41,20 @@ export function MetricChart({ title, xsMs, series, unit, onPick, height = 180 }:
       {
         width: node.clientWidth || 600,
         height,
-        legend: { show: series.length > 1, live: false }, // one series: the title says it
+        // One series: the title names it. Several: a legend whose values follow
+        // the cursor — the hover layer.
+        legend: { show: series.length > 1, live: true },
+        cursor: { points: { size: 8, width: 2 } },
         scales: unit === "percent" ? { y: { range: [0, 100] } } : {},
         axes: [
-          { stroke: "#8a93a6", grid: { stroke: "#2a2f3a" } },
-          { stroke: "#8a93a6", grid: { stroke: "#2a2f3a" }, size: 70, values: (_u, vals) => vals.map((v) => formatUnit(v, unit)) },
+          axis(),
+          axis({ size: 70, values: (_u, vals) => vals.map((v) => formatUnit(v, unit)) }),
         ],
-        series: [{}, ...series.map((s) => ({ label: s.label, stroke: s.color, width: 1.5, spanGaps: false }))],
+        series: [{}, ...series.map((s) => ({
+          label: s.label, stroke: s.color, width: 2, spanGaps: false,
+          fill: series.length === 1 ? s.color + "14" : undefined, // a faint wash under a lone series
+          value: (_u: uPlot, v: number | null) => (v === null ? "—" : formatUnit(v, unit)),
+        }))],
         hooks: {
           ready: [(u) => u.over.addEventListener("click", () => {
             const idx = u.cursor.idx;
@@ -69,7 +80,7 @@ export function MetricChart({ title, xsMs, series, unit, onPick, height = 180 }:
   }, [xsMs, series]);
 
   return (
-    <figure className="card metric-chart">
+    <figure className="card metric-chart enter" style={{ "--i": index } as React.CSSProperties}>
       <figcaption>{title}</figcaption>
       <div ref={el} className={onPick ? "pickable" : undefined} />
     </figure>
