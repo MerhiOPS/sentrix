@@ -64,14 +64,17 @@ func testMeteringFromWritePath(t *testing.T, st Stores) {
 	if _, err := st.CommitBatch(ctx, f.scope, second.ID, 3, prepared(T0, []int{0}, []uint64{1})); err != nil {
 		t.Fatal(err)
 	}
-	u, err := st.GetUsage(ctx, f.scope, T0)
+	// Metering stamps the store's own clock (the wall clock here, not T0):
+	// usage is read for the day it was written, or the test is a date bomb.
+	now := time.Now()
+	u, err := st.GetUsage(ctx, f.scope, now)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if u.MonthSamples != 4 || u.MonthPeakHosts != 2 || u.Hosts != 2 || u.MonthLogBytes <= 0 || u.LogBytesToday != u.MonthLogBytes {
 		t.Fatalf("usage %+v: want 4 samples (the replay not counted), 2 hosts, the log bytes today", u)
 	}
-	if next, _ := st.GetUsage(ctx, f.scope, T0.AddDate(0, 1, 0)); next.MonthSamples != 0 || next.LogBytesToday != 0 {
+	if next, _ := st.GetUsage(ctx, f.scope, now.AddDate(0, 1, 0)); next.MonthSamples != 0 || next.LogBytesToday != 0 {
 		t.Fatalf("next month's usage %+v, want zero", next)
 	}
 }
@@ -91,11 +94,12 @@ var planCrossCases = map[string]crossCase{
 		return ""
 	},
 	"PlanRepo.GetUsage": func(ctx context.Context, st Stores, a, b fixture) string {
-		before, _ := st.GetUsage(ctx, b.scope, T0)
+		now := time.Now() // the day metering stamps (see testMeteringFromWritePath)
+		before, _ := st.GetUsage(ctx, b.scope, now)
 		if _, err := st.CommitBatch(ctx, a.scope, a.host, 701, prepared(T0, []int{100, 101}, []uint64{1, 2})); err != nil {
 			return err.Error()
 		}
-		after, err := st.GetUsage(ctx, b.scope, T0)
+		after, err := st.GetUsage(ctx, b.scope, now)
 		if err != nil || after != before {
 			return fmt.Sprintf("GetUsage(B) changed with A's batch: %+v → %+v (%v)", before, after, err)
 		}
