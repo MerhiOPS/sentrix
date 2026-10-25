@@ -1,5 +1,7 @@
 # Sentrix
 
+[![CI](https://github.com/MerhiOPS/sentrix/actions/workflows/ci.yml/badge.svg)](https://github.com/MerhiOPS/sentrix/actions/workflows/ci.yml)
+
 Lightweight server monitoring: a Go agent for Linux and Windows, a single
 binary server with an embedded React dashboard, and SQLite storage behind
 ports that a ClickHouse adapter could implement.
@@ -129,7 +131,8 @@ cd web && npm ci && npm test && npm run build
 ```
 
 Plan and per-phase build log: [`docs/PLAN.md`](docs/PLAN.md),
-[`docs/LOG.md`](docs/LOG.md).
+[`docs/LOG.md`](docs/LOG.md). Conventions the code follows (and CI
+enforces): [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ## License
 
