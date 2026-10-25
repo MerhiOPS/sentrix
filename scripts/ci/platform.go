@@ -14,7 +14,7 @@ const windowsSys = "golang.org/x/sys/windows"
 
 // checkPlatform fails when a file imports golang.org/x/sys/windows (or a
 // subpackage) without being restricted to windows by file name or build
-// constraint. A Linux binary must not carry Windows syscalls (CLAUDE.md, Go).
+// constraint. A Linux binary must not carry Windows syscalls (CONTRIBUTING.md, Go).
 func checkPlatform(root string) ([]Violation, error) {
 	var vs []Violation
 	fset := token.NewFileSet()

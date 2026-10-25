@@ -1,4 +1,4 @@
-// Command ci runs the repository checks that CLAUDE.md says are enforced by
+// Command ci runs the repository checks that CONTRIBUTING.md says are enforced by
 // tooling rather than review: file length, import layering, SQL placement
 // and platform imports.
 //

@@ -1,5 +1,5 @@
 // Package sqlite is the SQLite storage adapter. It is the only package in the
-// repository allowed to contain SQL (CLAUDE.md, enforced by scripts/ci).
+// repository allowed to contain SQL (CONTRIBUTING.md, enforced by scripts/ci).
 package sqlite
 
 import (

@@ -655,7 +655,7 @@ is already scoped) — the statement audit does. That is why both exist.
 ## Phase 0 — Skeleton · 2026-10-24
 
 **Landed**
-- Module `github.com/MerhiOPS/sentrix`, `CLAUDE.md` conventions, LF-enforcing
+- Module `github.com/MerhiOPS/sentrix`, `CONTRIBUTING.md` conventions, LF-enforcing
   `.gitattributes`, `.gitignore` covering secrets and data files.
 - `scripts/ci` with four checks — `lines` (300/file), `layering` (DDD import
   direction incl. `wire`/`agent` rules), `rawsql` (SQL only in
