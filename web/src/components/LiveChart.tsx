@@ -1,11 +1,12 @@
 import { useEffect, useRef } from "react";
 import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
+import { CHROME, seriesColor } from "../lib/palette";
 import type { TimeBuffer } from "../lib/ringbuffer";
 
 const SERIES = [
-  { key: "cpu", label: "CPU %", stroke: "#4f8cff" },
-  { key: "mem", label: "Memory %", stroke: "#f2a33a" },
+  { key: "cpu", label: "CPU %", stroke: seriesColor(0) },
+  { key: "mem", label: "Memory %", stroke: seriesColor(1) },
 ];
 
 /** CPU and memory over the live window. uPlot redraws only the data. */
@@ -25,8 +26,13 @@ export function LiveChart({ buffer, version, width = 320, height = 110 }: {
         width, height,
         legend: { show: false },
         scales: { y: { range: [0, 100] } },
-        axes: [{ show: false }, { size: 40, stroke: "#8a93a6", grid: { stroke: "#2a2f3a" } }],
-        series: [{}, ...SERIES.map((s) => ({ label: s.label, stroke: s.stroke, width: 1.5, spanGaps: false }))],
+        cursor: { show: false },
+        axes: [{ show: false }, { size: 36, stroke: CHROME.muted, font: CHROME.font, grid: { stroke: CHROME.grid, width: 1 },
+          ticks: { show: false }, splits: () => [0, 50, 100] }],
+        series: [{}, ...SERIES.map((s, i) => ({
+          label: s.label, stroke: s.stroke, width: 2, spanGaps: false, fill: i === 0 ? s.stroke + "1a" : undefined,
+          points: { show: false }, // a sparkline: the line is the data, dots are noise
+        }))],
       },
       [[], [], []],
       el.current,

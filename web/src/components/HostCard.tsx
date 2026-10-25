@@ -4,15 +4,17 @@ import type { TimeBuffer } from "../lib/ringbuffer";
 import { hostHref } from "../hooks/useRoute";
 import { healthNotes } from "../lib/health";
 import { liveStatus } from "../lib/status";
+import { AnimatedNumber } from "./AnimatedNumber";
 import { LiveChart } from "./LiveChart";
 import { StatusBadge } from "./StatusBadge";
 
 /** One host in the fleet grid: status, latest values and a live chart. */
-export function HostCard({ host, buffer, version, now }: {
+export function HostCard({ host, buffer, version, now, index = 0 }: {
   host: Host;
   buffer: TimeBuffer | undefined;
   version: number;
   now: number;
+  index?: number;
 }) {
   const lastMs = Math.max(buffer?.latestMs() ?? 0, host.latest?.ts_ms ?? 0);
   const status = liveStatus(lastMs, host.interval_ms, now, host.status === "disabled");
@@ -24,15 +26,15 @@ export function HostCard({ host, buffer, version, now }: {
   const mem = fresh ? live.values.mem : l?.mem;
   const disk = fresh ? live.values.disk : l?.disk;
   return (
-    <article className="card host">
+    <article className={`card host enter status-${status}`} style={{ "--i": index } as React.CSSProperties}>
       <header>
         <h2 title={host.platform}><a href={hostHref(host.id)}>{host.name}</a></h2>
         <StatusBadge status={status} />
       </header>
       <dl className="stats">
-        <div><dt>CPU</dt><dd>{formatPercent(cpu)}</dd></div>
-        <div><dt>Memory</dt><dd>{formatPercent(mem)}</dd></div>
-        <div><dt>Disk</dt><dd>{formatPercent(disk)}</dd></div>
+        <div><dt>CPU</dt><dd><AnimatedNumber value={cpu} format={formatPercent} /></dd></div>
+        <div><dt>Memory</dt><dd><AnimatedNumber value={mem} format={formatPercent} /></dd></div>
+        <div><dt>Disk</dt><dd><AnimatedNumber value={disk} format={formatPercent} /></dd></div>
         <div><dt>Used</dt><dd>{l ? formatBytes(l.mem_used) : "—"}</dd></div>
       </dl>
       <LiveChart buffer={buffer} version={version} />

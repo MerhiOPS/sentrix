@@ -5,9 +5,17 @@ import { productName } from "../lib/brand";
 import { FleetGrid } from "./FleetGrid";
 import { HostDetailPage } from "./HostDetailPage";
 import { AlertsPage } from "./AlertsPage";
+import { BrandMark } from "./BrandMark";
 import { LogsPage } from "./LogsPage";
 import { SettingsPage } from "./SettingsPage";
 import { TokenButton } from "./TokenButton";
+
+const NAV = [
+  { page: "fleet", pages: ["fleet", "host"], href: "#/", label: "Fleet" },
+  { page: "logs", pages: ["logs"], href: "#/logs", label: "Logs" },
+  { page: "alerts", pages: ["alerts"], href: "#/alerts", label: "Alerts" },
+  { page: "settings", pages: ["settings"], href: "#/settings", label: "Settings" },
+];
 
 export function AppShell({ me }: { me: Me }) {
   const logoutM = useLogout();
@@ -15,15 +23,17 @@ export function AppShell({ me }: { me: Me }) {
   return (
     <div className="shell">
       <header className="topbar">
-        <a href="#/" className="brand"><strong>{productName}</strong></a>
-        <a href="#/" className="muted">Fleet</a>
-        <a href="#/logs" className="muted">Logs</a>
-        <a href="#/alerts" className="muted">Alerts</a>
-        <a href="#/settings" className="muted">Settings</a>
-        <span className="muted">{me.email} · {me.role}</span>
+        <a href="#/" className="brand"><BrandMark /><strong>{productName}</strong></a>
+        <nav className="nav">
+          {NAV.map((n) => (
+            <a key={n.page} href={n.href} className={n.pages.includes(route.page) ? "active" : ""}>{n.label}</a>
+          ))}
+        </nav>
+        <span className="who"><span className="avatar" aria-hidden>{me.email.slice(0, 1).toUpperCase()}</span>
+          <span className="muted small">{me.email} · {me.role}</span></span>
         <button className="link" onClick={() => logoutM.mutate()}>Sign out</button>
       </header>
-      <main>
+      <main key={route.page} className="page-enter">
         {route.page === "fleet" && (
           <>
             {me.role === "admin" && <TokenButton />}

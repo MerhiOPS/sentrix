@@ -1,0 +1,48 @@
+/* Motion: short, eased, and only where it carries meaning — content arriving,
+   something live, something that needs attention. All of it is off for
+   prefers-reduced-motion. */
+
+@keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pulse-ring {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes shimmer { from { background-position: -400px 0; } to { background-position: 400px 0; } }
+@keyframes alarm { 0%, 100% { box-shadow: 0 0 0 0 rgba(208, 59, 59, 0); } 50% { box-shadow: 0 0 0 4px rgba(208, 59, 59, 0.25); } }
+
+/* A page fades in on navigation; cards rise in, staggered by their index. */
+.page-enter { animation: fade 0.25s ease both; }
+.enter { animation: rise 0.4s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: calc(min(var(--i, 0), 12) * 45ms); }
+.alerts-page > *, .settings > *, .logs-page > * { animation: rise 0.35s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.alerts-page > :nth-child(2), .settings > :nth-child(2) { animation-delay: 60ms; }
+.alerts-page > :nth-child(3) { animation-delay: 120ms; }
+.alerts-page > :nth-child(4) { animation-delay: 180ms; }
+
+/* Something live breathes: the stream indicator, a reporting host. */
+.live.on i, .badge-ok .dot { animation: pulse-ring 2s ease-out infinite; }
+
+/* Something that needs attention pulses, a firing alert. */
+.badge-firing { animation: alarm 1.6s ease-in-out infinite; }
+
+/* Loading placeholders shimmer instead of "Loading…" text. */
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 0%, var(--surface-2) 50%, var(--surface) 100%);
+  background-size: 800px 100%; animation: shimmer 1.4s linear infinite;
+}
+
+/* Meters grow to their value. */
+.meter-fill { transition: width 0.7s cubic-bezier(0.2, 0.7, 0.2, 1), background 0.3s; }
+.settings .meter-fill { animation: grow 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both; transform-origin: left; }
+@keyframes grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* New log lines and table rows arrive softly. */
+.logs tbody tr, .procs tbody tr { animation: fade 0.3s ease both; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important; animation-delay: 0ms !important;
+  }
+}
