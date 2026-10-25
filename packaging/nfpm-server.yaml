@@ -8,7 +8,7 @@ priority: optional
 maintainer: MerhiOPS <noreply@users.noreply.github.com>
 description: Sentrix server — lightweight server monitoring.
 homepage: https://github.com/MerhiOPS/sentrix
-license: Proprietary
+license: All rights reserved
 contents:
   - src: dist/linux-${GOARCH}/sentrix-server
     dst: /usr/bin/sentrix-server

@@ -130,3 +130,8 @@ cd web && npm ci && npm test && npm run build
 
 Plan and per-phase build log: [`docs/PLAN.md`](docs/PLAN.md),
 [`docs/LOG.md`](docs/LOG.md).
+
+## License
+
+All rights reserved — see [`LICENSE`](LICENSE). The source is public to be
+read and evaluated; reuse needs the author's permission.
