@@ -2203,7 +2203,7 @@ export interface operations {
     exportData: {
         parameters: {
             query: {
-                table: "metrics" | "logs" | "alert_events";
+                table: "metrics" | "logs" | "alert_events" | "monitor_results" | "monitor_incidents";
                 from: string;
                 to: string;
                 format?: "csv" | "ndjson";

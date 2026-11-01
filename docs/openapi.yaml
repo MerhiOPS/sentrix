@@ -639,7 +639,7 @@ paths:
         `{"error": …}` record; CSV simply ends early — use NDJSON when
         completeness must be checked. At most 400 days per request.
       parameters:
-        - { name: table, in: query, required: true, schema: { type: string, enum: [metrics, logs, alert_events] } }
+        - { name: table, in: query, required: true, schema: { type: string, enum: [metrics, logs, alert_events, monitor_results, monitor_incidents] } }
         - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
         - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
         - { name: format, in: query, schema: { type: string, enum: [csv, ndjson] } }

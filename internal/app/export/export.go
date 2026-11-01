@@ -20,6 +20,9 @@ const (
 	TableMetrics Table = "metrics"
 	TableLogs    Table = "logs"
 	TableEvents  Table = "alert_events"
+	// Uptime tables (exported when the exporter has a MonitorReader).
+	TableMonitorResults   Table = "monitor_results"
+	TableMonitorIncidents Table = "monitor_incidents"
 )
 
 // MaxRange bounds one export; longer histories are exported in parts.
@@ -48,10 +51,11 @@ type EventLister interface {
 
 // Exporter runs exports.
 type Exporter struct {
-	hosts  query.HostReader
-	core   query.CoreReader
-	logs   query.LogReader
-	events EventLister
+	hosts    query.HostReader
+	core     query.CoreReader
+	logs     query.LogReader
+	events   EventLister
+	monitors MonitorReader // optional
 }
 
 // New builds an exporter.
@@ -64,11 +68,21 @@ func New(h query.HostReader, c query.CoreReader, l query.LogReader, e EventListe
 func (e *Exporter) Prepare(ctx context.Context, s domain.Scope, req Request) ([]domain.Host, error) {
 	switch req.Table {
 	case TableMetrics, TableLogs, TableEvents:
+	case TableMonitorResults, TableMonitorIncidents:
+		if e.monitors == nil {
+			return nil, fmt.Errorf("%w: uptime tables are not available", domain.ErrInvalid)
+		}
+		if req.Host != nil {
+			return nil, fmt.Errorf("%w: uptime tables are per monitor, not per host", domain.ErrInvalid)
+		}
 	default:
-		return nil, fmt.Errorf("%w: table must be metrics, logs or alert_events", domain.ErrInvalid)
+		return nil, fmt.Errorf("%w: table must be metrics, logs, alert_events, monitor_results or monitor_incidents", domain.ErrInvalid)
 	}
 	if !req.From.Before(req.To) || req.To.Sub(req.From) > MaxRange {
 		return nil, fmt.Errorf("%w: from must be before to, at most 400 days apart", domain.ErrInvalid)
+	}
+	if req.Table == TableMonitorResults || req.Table == TableMonitorIncidents {
+		return nil, nil
 	}
 	if req.Host != nil {
 		h, err := e.hosts.GetHost(ctx, s, *req.Host)
@@ -89,6 +103,10 @@ func (e *Exporter) Run(ctx context.Context, s domain.Scope, req Request, hosts [
 		return e.metrics(ctx, s, req, hosts, sink)
 	case TableLogs:
 		return e.logLines(ctx, s, req, hosts, sink)
+	case TableMonitorResults:
+		return e.monitorResults(ctx, s, req, sink)
+	case TableMonitorIncidents:
+		return e.monitorIncidents(ctx, s, req, sink)
 	default:
 		return e.alertEvents(ctx, s, req, hosts, sink)
 	}

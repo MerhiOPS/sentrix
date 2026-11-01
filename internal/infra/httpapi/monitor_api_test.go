@@ -242,3 +242,29 @@ func TestMonitorHistoryMatchesTheSpec(t *testing.T) {
 		}
 	}
 }
+
+func TestExportUptimeTables(t *testing.T) {
+	r := newRig(t)
+	admin := r.login(t, r.a.admin)
+	created := r.createMonitor(t, admin, shopBody)
+	ctx := context.Background()
+	m, _ := r.store.GetMonitor(ctx, r.a.scope, created.ID)
+	st, _ := r.store.MonitorStates(ctx, r.a.scope)
+	res := domain.CheckResult{At: time.Now().UTC().Add(-time.Minute), Outcome: domain.CheckDown, Class: domain.ErrDNS}
+	if _, err := r.store.RecordCheck(ctx, r.a.scope, uptime.CheckRecord{Monitor: m, Result: res,
+		Step: domain.StepMonitor(m, st[0], res), Revision: st[0].Revision}); err != nil {
+		t.Fatal(err)
+	}
+	q := "&from=" + time.Now().Add(-time.Hour).UTC().Format(time.RFC3339) + "&to=" + time.Now().Add(time.Hour).UTC().Format(time.RFC3339)
+	out := r.call(t, "GET", "/api/v1/export?table=monitor_results&format=csv"+q, admin, "")
+	if out.status != http.StatusOK || !strings.Contains(string(out.body), "monitor_id,monitor,at,outcome,error") ||
+		!strings.Contains(string(out.body), ",shop,") || !strings.Contains(string(out.body), ",down,dns,") {
+		t.Fatalf("export: %d %s", out.status, out.body)
+	}
+	if res := r.call(t, "GET", "/api/v1/export?table=monitor_results&host="+r.a.host.String()+q, admin, ""); res.status != http.StatusBadRequest {
+		t.Fatalf("an uptime table with a host: %d, want 400", res.status)
+	}
+	if other := r.call(t, "GET", "/api/v1/export?table=monitor_results&format=csv"+q, r.login(t, r.b.admin), ""); strings.Contains(string(other.body), "shop") {
+		t.Fatal("tenant B's export contains tenant A's monitor")
+	}
+}

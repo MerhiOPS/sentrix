@@ -85,7 +85,7 @@ func newRig(t *testing.T) *rig {
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, r.auth, time.Now),
 		Ready:       func(context.Context) error { return r.notReady },
 		Plans:       identity.NewPlans(st, time.Now),
-		Export:      export.New(st, st, st, st),
+		Export:      export.New(st, st, st, st).WithMonitors(st),
 		System:      func(context.Context) (ServerStats, error) { return ServerStats{DBBytes: 4096, TTLOverdueS: 0}, nil },
 		FormatToken: func(b []byte) string { return "stx1.test" }, Now: time.Now,
 	})

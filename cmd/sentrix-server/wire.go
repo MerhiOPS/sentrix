@@ -81,7 +81,7 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
 		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub, func() httpapi.UptimeStats { return uptimeStats(sched, refs) }),
 		Plans:        identity.NewPlans(st, time.Now),
-		Export:       export.New(st, st, st, st),
+		Export:       export.New(st, st, st, st).WithMonitors(st),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
 		Web:          dist,
 		ExtraOrigins: extraOrigins,
