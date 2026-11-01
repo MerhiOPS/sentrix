@@ -31,7 +31,9 @@ func (f *fakeData) GetHost(_ context.Context, _ domain.Scope, id domain.HostID) 
 	}
 	return domain.Host{}, domain.ErrNotFound
 }
-func (f *fakeData) ListHosts(context.Context, domain.Scope) ([]domain.Host, error) { return f.hosts, nil }
+func (f *fakeData) ListHosts(context.Context, domain.Scope) ([]domain.Host, error) {
+	return f.hosts, nil
+}
 
 func (f *fakeData) RawCore(_ context.Context, _ domain.Scope, h domain.HostID, from, to time.Time) ([]domain.CoreSample, error) {
 	f.coreReads++
@@ -48,7 +50,7 @@ func (f *fakeData) SearchLogs(_ context.Context, _ domain.Scope, q query.LogQuer
 	f.logReads++
 	var out []query.LogEntry
 	for _, l := range f.logs {
-		if q.Before != nil && !(l.Line.TS.Before(q.Before.TS) || (l.Line.TS.Equal(q.Before.TS) && l.ID < q.Before.ID)) {
+		if q.Before != nil && !l.Line.TS.Before(q.Before.TS) && (!l.Line.TS.Equal(q.Before.TS) || l.ID >= q.Before.ID) {
 			continue
 		}
 		if len(out) == q.Limit {

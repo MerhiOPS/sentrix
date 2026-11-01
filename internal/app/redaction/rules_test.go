@@ -24,7 +24,9 @@ func (f *fakeRepo) CreateRedactionRule(_ context.Context, _ domain.Scope, r doma
 	f.rules = append(f.rules, r)
 	return r.ID, nil
 }
-func (f *fakeRepo) DeleteRedactionRule(context.Context, domain.Scope, int64) error { return f.deleteErr }
+func (f *fakeRepo) DeleteRedactionRule(context.Context, domain.Scope, int64) error {
+	return f.deleteErr
+}
 
 type fakeInvalidator struct{ tenants []domain.TenantID }
 
