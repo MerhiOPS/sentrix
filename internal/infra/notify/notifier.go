@@ -1,3 +1,5 @@
+// Package notify delivers alert notifications to webhooks and Slack through
+// an HTTP client that refuses to reach internal addresses (infra/netguard).
 package notify
 
 import (
@@ -10,6 +12,7 @@ import (
 
 	"github.com/MerhiOPS/sentrix/internal/app/alerting"
 	"github.com/MerhiOPS/sentrix/internal/domain"
+	"github.com/MerhiOPS/sentrix/internal/infra/netguard"
 )
 
 // Notifier implements alerting.Notifier for webhook and Slack channels.
@@ -17,8 +20,9 @@ type Notifier struct {
 	p *poster
 }
 
-// New returns a notifier behind the SSRF guard.
-func New() *Notifier { return &Notifier{p: newPoster(control, nil)} }
+// New returns a notifier behind the SSRF guard. Webhooks are always
+// strict: alert content never goes to a private address.
+func New() *Notifier { return &Notifier{p: newPoster(netguard.Strict.Control, nil)} }
 
 // Notify implements alerting.Notifier.
 func (n *Notifier) Notify(ctx context.Context, ch domain.Channel, m alerting.Message) error {
