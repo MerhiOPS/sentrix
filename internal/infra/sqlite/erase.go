@@ -229,14 +229,7 @@ func (s *Store) Purge(ctx context.Context, ops domain.OpsScope) error {
 			return fmt.Errorf("purge (%s): %w", q, err)
 		}
 	}
-	var busy, logFrames, done int
-	if err := w.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &done); err != nil {
-		return fmt.Errorf("checkpoint: %w", err)
-	}
-	if busy != 0 {
-		return errors.New("checkpoint could not truncate the WAL: a reader is active — stop the server and retry")
-	}
-	return nil
+	return s.db.Checkpoint(ctx)
 }
 
 // Residue implements compliance.ErasureStore.

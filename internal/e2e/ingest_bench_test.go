@@ -69,7 +69,12 @@ func typicalBatch(seq uint64, at time.Time) []byte {
 // host sends one batch per 10 s.
 //
 //	go test ./internal/e2e -run '^$' -bench IngestCeiling -benchtime 20000x
-func BenchmarkIngestCeiling(b *testing.B) {
+func BenchmarkIngestCeiling(b *testing.B) { ingestCeiling(b, nil) }
+
+// ingestCeiling runs the benchmark. setup, when set, prepares untimed and
+// returns a load that runs alongside the timed loop on the same store until
+// its context ends.
+func ingestCeiling(b *testing.B, setup func(st *sqlite.Store, sc domain.Scope) func(ctx context.Context)) {
 	ctx := context.Background()
 	db, err := sqlite.OpenMigrated(ctx, filepath.Join(b.TempDir(), "bench.db"))
 	if err != nil {
@@ -79,6 +84,11 @@ func BenchmarkIngestCeiling(b *testing.B) {
 	st := sqlite.NewStore(db)
 	tn, err := identity.NewTenants(st, time.Now).Create(ctx, "bench")
 	if err != nil {
+		b.Fatal(err)
+	}
+	plan := domain.DefaultPlan
+	plan.MaxHosts = benchHosts // the default plan allows 100
+	if err := identity.NewPlans(st, time.Now).Set(ctx, tn.ID, plan); err != nil {
 		b.Fatal(err)
 	}
 	enr := identity.NewEnrollment(st, time.Now)
@@ -91,6 +101,14 @@ func BenchmarkIngestCeiling(b *testing.B) {
 	}
 	start := time.Now().Add(-60 * time.Hour) // inside the 72 h window, advancing 10 s per batch
 	var next atomic.Uint64
+	bg, stopBG := context.WithCancel(ctx)
+	bgDone := make(chan struct{})
+	if setup != nil {
+		load := setup(st, sc)
+		go func() { load(bg); close(bgDone) }()
+	} else {
+		close(bgDone)
+	}
 	b.ResetTimer()
 	t0 := time.Now()
 	var wg sync.WaitGroup
@@ -122,6 +140,8 @@ func BenchmarkIngestCeiling(b *testing.B) {
 	}
 	wg.Wait()
 	rate := float64(b.N) / time.Since(t0).Seconds()
+	stopBG()
+	<-bgDone
 	b.ReportMetric(rate, "batches/s")
 	b.ReportMetric(rate*10, "hosts@5s")
 	b.ReportMetric(rate*38, "values/s")

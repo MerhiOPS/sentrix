@@ -91,6 +91,19 @@ func (db *DB) verify(ctx context.Context) error {
 // Writer returns the single-connection write pool.
 func (db *DB) Writer() *sql.DB { return db.w }
 
+// Checkpoint folds the WAL into the database file and truncates it, so the
+// file holds everything committed. It fails if a reader keeps it busy.
+func (db *DB) Checkpoint(ctx context.Context) error {
+	var busy, logFrames, done int
+	if err := db.w.QueryRowContext(ctx, `PRAGMA wal_checkpoint(TRUNCATE)`).Scan(&busy, &logFrames, &done); err != nil {
+		return fmt.Errorf("checkpoint: %w", err)
+	}
+	if busy != 0 {
+		return errors.New("checkpoint could not truncate the WAL: a reader is active — stop the server and retry")
+	}
+	return nil
+}
+
 // Path is the database file (its WAL is Path + "-wal").
 func (db *DB) Path() string { return db.path }
 
