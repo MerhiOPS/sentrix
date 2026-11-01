@@ -2,6 +2,7 @@ package uptime
 
 import (
 	"context"
+	"slices"
 	"time"
 
 	"github.com/MerhiOPS/sentrix/internal/domain"
@@ -28,8 +29,9 @@ type View struct {
 	// Uptime by window; absent when nothing in the window was monitored.
 	Uptime map[time.Duration]float64
 	Bars   []domain.DayBar
-	// AvgLatency is over the last 24 h of checks that measured one.
-	AvgLatency time.Duration
+	// AvgLatency is over the last 24 h of checks that measured one; nil
+	// when none did (a measured 0 ms is a value, not missing).
+	AvgLatency *time.Duration
 }
 
 // List returns every monitor with its state, 24 h and 30 d uptime and the
@@ -87,7 +89,36 @@ func (a *Admin) Get(ctx context.Context, s domain.Scope, id int64) (View, error)
 	return view(m, st, hours, now, DetailBars, Window24h, Window7d, Window30d, Window90d), nil
 }
 
+// withOpenSpan adds the time since the last check, in the state it is in,
+// to a copy of the rollups. The next check will attribute exactly that
+// (within the same two-interval limit), so the view does not show a down
+// monitor at 100 % for up to one interval.
+func withOpenSpan(m domain.Monitor, st domain.MonitorState, hours []domain.MonitorHour, now time.Time) []domain.MonitorHour {
+	if st.LastCheck.IsZero() || (st.Status != domain.MonitorUp && st.Status != domain.MonitorDown) {
+		return hours
+	}
+	end := now
+	if limit := st.LastCheck.Add(2 * m.Interval); limit.Before(end) {
+		end = limit
+	}
+	out := append([]domain.MonitorHour(nil), hours...)
+	for _, sl := range domain.HourSlices(domain.Span{Start: st.LastCheck, End: end}) {
+		i := slices.IndexFunc(out, func(h domain.MonitorHour) bool { return h.Hour.Equal(sl.Hour) })
+		if i < 0 {
+			out = append(out, domain.MonitorHour{Monitor: m.ID, Hour: sl.Hour})
+			i = len(out) - 1
+		}
+		if st.Status == domain.MonitorDown {
+			out[i].Down += sl.D
+		} else {
+			out[i].Up += sl.D
+		}
+	}
+	return out
+}
+
 func view(m domain.Monitor, st domain.MonitorState, hours []domain.MonitorHour, now time.Time, bars int, windows ...time.Duration) View {
+	hours = withOpenSpan(m, st, hours, now)
 	v := View{Monitor: m, State: st, Uptime: map[time.Duration]float64{}, Bars: domain.DailyBars(hours, now, bars)}
 	for _, w := range windows {
 		if ratio, _, ok := domain.Uptime(domain.UptimeWindow(hours, now, w)); ok {
@@ -101,7 +132,8 @@ func view(m domain.Monitor, st domain.MonitorState, hours []domain.MonitorHour, 
 		n += h.LatencyN
 	}
 	if n > 0 {
-		v.AvgLatency = sum / time.Duration(n)
+		avg := sum / time.Duration(n)
+		v.AvgLatency = &avg
 	}
 	return v
 }

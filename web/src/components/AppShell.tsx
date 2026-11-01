@@ -7,11 +7,14 @@ import { HostDetailPage } from "./HostDetailPage";
 import { AlertsPage } from "./AlertsPage";
 import { BrandMark } from "./BrandMark";
 import { LogsPage } from "./LogsPage";
+import { MonitorDetailPage } from "./MonitorDetailPage";
 import { SettingsPage } from "./SettingsPage";
 import { TokenButton } from "./TokenButton";
+import { UptimePage } from "./UptimePage";
 
 const NAV = [
   { page: "fleet", pages: ["fleet", "host"], href: "#/", label: "Fleet" },
+  { page: "uptime", pages: ["uptime", "monitor"], href: "#/uptime", label: "Uptime" },
   { page: "logs", pages: ["logs"], href: "#/logs", label: "Logs" },
   { page: "alerts", pages: ["alerts"], href: "#/alerts", label: "Alerts" },
   { page: "settings", pages: ["settings"], href: "#/settings", label: "Settings" },
@@ -41,6 +44,8 @@ export function AppShell({ me }: { me: Me }) {
           </>
         )}
         {route.page === "host" && <HostDetailPage hostId={route.hostId} tab={route.tab} range={route.range} isAdmin={me.role === "admin"} />}
+        {route.page === "uptime" && <UptimePage isAdmin={me.role === "admin"} />}
+        {route.page === "monitor" && <MonitorDetailPage id={route.monitorId} isAdmin={me.role === "admin"} />}
         {route.page === "settings" && <SettingsPage />}
         {route.page === "alerts" && <AlertsPage isAdmin={me.role === "admin"} />}
         {route.page === "logs" && <LogsPage hostId={route.hostId} atMs={route.atMs} isAdmin={me.role === "admin"} />}

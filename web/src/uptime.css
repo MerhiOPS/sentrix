@@ -1,0 +1,48 @@
+/* Uptime: status badges, the monitor list, daily bars, the form. */
+.badge-m-up { background: rgba(12, 163, 12, 0.14); color: #3fcf3f; }
+.badge-m-down { background: rgba(208, 59, 59, 0.18); color: #f08a8a; }
+.badge-m-pending { background: rgba(250, 178, 25, 0.14); color: var(--warning); }
+.badge-m-paused { background: var(--surface-2); color: var(--muted); }
+.section-head .badge { margin-left: 4px; }
+
+.uptime-page, .monitor-detail { display: grid; gap: 16px; }
+.monitors { width: 100%; border-collapse: collapse; font-size: 14px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.monitors th { text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+.monitors th, .monitors td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.monitors tbody tr { transition: background 0.12s; }
+.monitors tbody tr:hover { background: var(--surface-2); }
+.monitor-row.status-paused { opacity: 0.6; }
+.monitor-name { text-decoration: none; font-weight: 500; }
+.monitor-name:hover { color: var(--accent); }
+.bars-cell { width: 34%; min-width: 220px; }
+.cert-expiring { color: var(--warning); }
+
+/* One bar per day, 2px surface gap between them; level colours are the
+   reserved status tokens and every bar carries its fact as text. */
+.uptime-bars { list-style: none; margin: 0; padding: 0; display: flex; gap: 2px; height: 26px; align-items: stretch; }
+.uptime-bars .bar { flex: 1 1 0; min-width: 2px; border-radius: 2px; transition: transform 0.12s, filter 0.12s; }
+.uptime-bars .bar:hover { transform: scaleY(1.12); filter: brightness(1.15); }
+.bar-good { background: var(--good); }
+.bar-warning { background: var(--warning); }
+.bar-critical { background: var(--critical); }
+.bar-gap { background: var(--surface-3); }
+.bar-key { display: flex; gap: 16px; flex-wrap: wrap; margin: 8px 0 0; }
+.bar-key span { display: inline-flex; align-items: center; gap: 6px; }
+.bar-key .bar { display: inline-block; width: 10px; height: 10px; border-radius: 2px; }
+.monitor-detail .uptime-bars { height: 34px; }
+
+.uptime-tiles { grid-template-columns: repeat(4, 1fr); }
+.monitor-detail h3 { margin: 6px 0 10px; }
+.monitor-actions { margin-left: auto; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.detail-head .monitor-actions button { margin-left: 0; }
+.mini-grid.two { grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); }
+.events { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; font-size: 14px; }
+.events .badge, .monitor-detail td .badge { margin-left: 6px; }
+
+.monitor-form { display: grid; gap: 12px; }
+.monitor-form h3 { margin: 0; }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.form-grid label { display: grid; gap: 4px; font-size: 13px; color: var(--text-2); }
+.form-grid label.wide { grid-column: 1 / -1; }
+.form-grid label.inline { display: flex; align-items: center; gap: 8px; align-self: end; }
+.form-actions { display: flex; gap: 12px; align-items: center; }

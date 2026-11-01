@@ -136,7 +136,7 @@ func toMonitor(v uptime.View) monitorDTO {
 	for w, ratio := range v.Uptime {
 		out.Uptime[windowNames[w]] = ratio
 	}
-	if v.AvgLatency > 0 {
+	if v.AvgLatency != nil {
 		ms := v.AvgLatency.Milliseconds()
 		out.AvgLatencyMS = &ms
 	}

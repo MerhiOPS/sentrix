@@ -15,7 +15,8 @@ type Route = Reply | ((body: unknown) => Reply | Promise<Reply>);
 
 /**
  * Replaces fetch with a fixed set of API routes, keyed "METHOD /path" (the
- * part after /api/v1). A request to any other route fails the test: a
+ * part after /api/v1; a trailing * matches any rest, for query strings
+ * carrying times). A request to any other route fails the test: a
  * component calling an endpoint nobody expected is a bug, not a no-op.
  */
 export function mockApi(routes: Record<string, Route>): Call[] {
@@ -25,7 +26,8 @@ export function mockApi(routes: Record<string, Route>): Call[] {
     const path = url.replace(/^\/api\/v1/, "");
     const body = typeof init.body === "string" ? JSON.parse(init.body) : undefined;
     calls.push({ method, path, body });
-    const route = routes[`${method} ${path}`];
+    const key = `${method} ${path}`;
+    const route = routes[key] ?? Object.entries(routes).find(([k]) => k.endsWith("*") && key.startsWith(k.slice(0, -1)))?.[1];
     if (!route) throw new Error(`unexpected request: ${method} ${path}`);
     const reply = await (typeof route === "function" ? route(body) : route);
     return new Response(reply.status === 204 ? null : JSON.stringify(reply.body ?? {}), {

@@ -27,6 +27,7 @@ export function SettingsPage() {
         <h3>Plan</h3>
         <Meter label="Hosts" used={usage.hosts} limit={plan.max_hosts} fmt={String} />
         <Meter label="Logs stored today" used={usage.log_bytes_today} limit={plan.log_bytes_per_day} fmt={formatBytes} />
+        <Meter label="Uptime monitors" used={usage.monitors} limit={plan.max_monitors} fmt={String} />
         <p className="muted small">
           Over the host limit, new enrollments are refused and existing hosts keep reporting. Over the daily log
           budget, logs are dropped until midnight UTC and metrics keep flowing.
@@ -34,6 +35,7 @@ export function SettingsPage() {
         <dl className="stats">
           <div><dt>Metric history</dt><dd>{plan.metrics_retention_days} d</dd></div>
           <div><dt>Logs kept</dt><dd>{plan.logs_retention_days} d</dd></div>
+          <div><dt>Fastest check</dt><dd>{plan.min_check_interval_s} s</dd></div>
         </dl>
       </section>
       <section className="card">
@@ -42,6 +44,7 @@ export function SettingsPage() {
           <div><dt>Samples</dt><dd>{usage.month_samples.toLocaleString()}</dd></div>
           <div><dt>Logs</dt><dd>{formatBytes(usage.month_log_bytes)}</dd></div>
           <div><dt>Peak hosts</dt><dd>{usage.month_peak_hosts}</dd></div>
+          <div><dt>Uptime checks</dt><dd>{usage.month_checks.toLocaleString()}</dd></div>
         </dl>
       </section>
     </div>

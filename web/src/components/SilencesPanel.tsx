@@ -7,10 +7,11 @@ interface Props {
   isAdmin: boolean;
   ruleName: Map<number, string>;
   hostName: Map<string, string>;
+  monitorName?: Map<number, string>;
 }
 
 /** Maintenance windows: notifications are held back, transitions still recorded. */
-export function SilencesPanel({ silences, isAdmin, ruleName, hostName }: Props) {
+export function SilencesPanel({ silences, isAdmin, ruleName, hostName, monitorName }: Props) {
   const { createSilence, deleteSilence } = useAlertMutations();
   const [hours, setHours] = useState(2);
   const [reason, setReason] = useState("");
@@ -21,8 +22,12 @@ export function SilencesPanel({ silences, isAdmin, ruleName, hostName }: Props) 
       <ul>
         {silences.filter((s) => Date.parse(s.ends) > now).map((s) => (
           <li key={s.id}>
-            {s.rule_id === null ? "all rules" : ruleName.get(s.rule_id) ?? `rule ${s.rule_id}`} on{" "}
-            {s.host_id === null ? "all hosts" : hostName.get(s.host_id) ?? s.host_id}{" "}
+            {s.monitor_id !== null
+              ? <>monitor {monitorName?.get(s.monitor_id) ?? `#${s.monitor_id}`}</>
+              : <>
+                {s.rule_id === null ? "all rules" : ruleName.get(s.rule_id) ?? `rule ${s.rule_id}`} on{" "}
+                {s.host_id === null ? "all hosts" : hostName.get(s.host_id) ?? s.host_id}
+              </>}{" "}
             <span className="muted small">until {new Date(s.ends).toLocaleString()} {s.reason && `· ${s.reason}`}</span>{" "}
             {isAdmin && <button className="link" onClick={() => deleteSilence.mutate(s.id)}>end</button>}
           </li>
@@ -35,7 +40,7 @@ export function SilencesPanel({ silences, isAdmin, ruleName, hostName }: Props) 
           createSilence.mutate({ starts: starts.toISOString(), ends: new Date(starts.getTime() + hours * 3_600_000).toISOString(), reason },
             { onSuccess: () => setReason("") });
         }}>
-          <label className="inline">silence everything for (h)
+          <label className="inline">silence every alert and monitor for (h)
             <input type="number" min={1} max={720} value={hours} onChange={(e) => setHours(Number(e.target.value))} />
           </label>
           <input placeholder="reason" value={reason} onChange={(e) => setReason(e.target.value)} />

@@ -19,7 +19,7 @@ const axis = (extra: Partial<uPlot.Axis> = {}): uPlot.Axis => ({
  * A time-series chart. Null values draw gaps (never zero). Clicking the plot
  * reports the timestamp under the cursor via onPick.
  */
-export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, index = 0 }: {
+export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, index = 0, readout = false }: {
   title: string;
   xsMs: number[];
   series: ChartSeries[];
@@ -27,6 +27,7 @@ export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, i
   onPick?: (tsMs: number) => void;
   height?: number;
   index?: number; // position in a grid, for the staggered entrance
+  readout?: boolean; // a lone series still shows its value under the cursor
 }) {
   const el = useRef<HTMLDivElement>(null);
   const plot = useRef<uPlot | null>(null);
@@ -43,7 +44,7 @@ export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, i
         height,
         // One series: the title names it. Several: a legend whose values follow
         // the cursor — the hover layer.
-        legend: { show: series.length > 1, live: true },
+        legend: { show: series.length > 1 || readout, live: true },
         cursor: { points: { size: 8, width: 2 } },
         scales: unit === "percent" ? { y: { range: [0, 100] } } : {},
         axes: [
@@ -73,7 +74,7 @@ export function MetricChart({ title, xsMs, series, unit, onPick, height = 180, i
       ro.disconnect();
       p.destroy();
     };
-  }, [shape, unit, height]); // rebuilt only when the series shape changes; data flows through setData below
+  }, [shape, unit, height, readout]); // rebuilt only when the series shape changes; data flows through setData below
 
   useEffect(() => {
     plot.current?.setData([xsMs.map((x) => x / 1000), ...series.map((s) => s.values)] as uPlot.AlignedData);

@@ -1,5 +1,6 @@
 import { useAlertConfig, useAlerts, useAlertMutations } from "../hooks/useAlerts";
 import { useHosts } from "../hooks/useHosts";
+import { useMonitors } from "../hooks/useMonitors";
 import { hostHref } from "../hooks/useRoute";
 import { formatAge } from "../lib/format";
 import { describeRule } from "../lib/ruleText";
@@ -14,6 +15,8 @@ export function AlertsPage({ isAdmin }: { isAdmin: boolean }) {
   const { rules, channels, silences } = useAlertConfig();
   const { deleteRule } = useAlertMutations();
   const hosts = useHosts();
+  const monitors = useMonitors();
+  const monitorName = new Map(monitors.data?.monitors.map((m) => [m.id, m.name]));
   const hostName = new Map(hosts.data?.hosts.map((h) => [h.id, h.name]));
   const ruleName = new Map(rules.data?.rules.map((r) => [r.id, r.name]));
   const now = Date.now();
@@ -55,7 +58,8 @@ export function AlertsPage({ isAdmin }: { isAdmin: boolean }) {
       <AlertEvents events={alerts.data?.events ?? []} ruleName={ruleName} hostName={hostName} />
       <div className="mini-grid">
         <ChannelsPanel channels={channels.data?.channels ?? []} isAdmin={isAdmin} />
-        <SilencesPanel silences={silences.data?.silences ?? []} isAdmin={isAdmin} ruleName={ruleName} hostName={hostName} />
+        <SilencesPanel silences={silences.data?.silences ?? []} isAdmin={isAdmin} ruleName={ruleName} hostName={hostName}
+          monitorName={monitorName} />
       </div>
     </div>
   );

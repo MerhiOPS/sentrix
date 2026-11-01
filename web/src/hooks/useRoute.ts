@@ -5,6 +5,8 @@ export type Route =
   | { page: "host"; hostId: string; tab: string; range: string }
   | { page: "logs"; hostId: string | null; atMs: number | null }
   | { page: "alerts" }
+  | { page: "uptime" }
+  | { page: "monitor"; monitorId: number }
   | { page: "settings" };
 
 /** Parses "#/hosts/<id>?tab=cpu&range=6h" and friends. Pure, so testable. */
@@ -20,12 +22,20 @@ export function parseRoute(hash: string): Route {
     return { page: "logs", hostId: q.get("host"), atMs: Number.isFinite(at) && at > 0 ? at : null };
   }
   if (parts[0] === "alerts") return { page: "alerts" };
+  if (parts[0] === "uptime") {
+    const id = Number(parts[1]);
+    return Number.isInteger(id) && id > 0 ? { page: "monitor", monitorId: id } : { page: "uptime" };
+  }
   if (parts[0] === "settings") return { page: "settings" };
   return { page: "fleet" };
 }
 
 export function hostHref(hostId: string, tab = "cpu", range = "1h"): string {
   return `#/hosts/${hostId}?tab=${tab}&range=${range}`;
+}
+
+export function monitorHref(id: number): string {
+  return `#/uptime/${id}`;
 }
 
 /** Where a chart click goes: the logs around that moment on that host. */

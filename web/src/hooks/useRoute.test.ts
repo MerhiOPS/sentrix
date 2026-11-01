@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { hostHref, logsHref, parseRoute } from "./useRoute";
+import { hostHref, logsHref, monitorHref, parseRoute } from "./useRoute";
 
 describe("routes", () => {
   it("parses host pages with defaults", () => {
@@ -8,6 +8,11 @@ describe("routes", () => {
   });
   it("chart clicks carry host and time to the logs route", () => {
     expect(parseRoute(logsHref("abc", 1_790_000_000_123.4))).toEqual({ page: "logs", hostId: "abc", atMs: 1_790_000_000_123 });
+  });
+  it("parses the uptime list and monitor pages", () => {
+    expect(parseRoute("#/uptime")).toEqual({ page: "uptime" });
+    expect(parseRoute(monitorHref(7))).toEqual({ page: "monitor", monitorId: 7 });
+    expect(parseRoute("#/uptime/abc")).toEqual({ page: "uptime" });
   });
   it("parses the alerts page", () => {
     expect(parseRoute("#/alerts")).toEqual({ page: "alerts" });

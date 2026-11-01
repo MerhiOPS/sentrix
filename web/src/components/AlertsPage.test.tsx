@@ -14,6 +14,7 @@ function serve() {
     "GET /channels": { status: 200, body: { channels: [slack] } },
     "GET /silences": { status: 200, body: { silences: [] } },
     "GET /hosts": { status: 200, body: { hosts: [host()], server_time: "2026-03-01T00:00:00Z" } },
+    "GET /monitors": { status: 200, body: { monitors: [], ping_available: true } },
   });
 }
 

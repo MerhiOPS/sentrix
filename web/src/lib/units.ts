@@ -1,6 +1,6 @@
 import { formatBytes } from "./format";
 
-export type Unit = "percent" | "bytes" | "rate" | "load";
+export type Unit = "percent" | "bytes" | "rate" | "load" | "ms";
 
 /** Axis/tooltip text for a value in a unit. Null is "no data". */
 export function formatUnit(v: number | null | undefined, unit: Unit): string {
@@ -12,6 +12,8 @@ export function formatUnit(v: number | null | undefined, unit: Unit): string {
       return formatBytes(v);
     case "rate":
       return `${formatBytes(v)}/s`;
+    case "ms":
+      return v >= 1000 ? `${(v / 1000).toFixed(1)} s` : `${Math.round(v)} ms`;
     default:
       return v.toFixed(2);
   }

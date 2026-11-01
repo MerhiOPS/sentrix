@@ -8,5 +8,7 @@ describe("formatUnit", () => {
     expect(formatUnit(1536, "rate")).toBe("1.5 KiB/s");
     expect(formatUnit(0.5, "load")).toBe("0.50");
     expect(formatUnit(null, "rate")).toBe("—");
+    expect(formatUnit(84.4, "ms")).toBe("84 ms");
+    expect(formatUnit(1540, "ms")).toBe("1.5 s");
   });
 });
