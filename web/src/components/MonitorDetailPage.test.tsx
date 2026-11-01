@@ -44,3 +44,23 @@ describe("MonitorDetailPage", () => {
     expect(calls.some((c) => c.method === "POST" && c.path === "/monitors/1/pause")).toBe(true);
   });
 });
+
+describe("deleting a monitor", () => {
+  it("returns to the list instead of showing the deleted monitor as missing", async () => {
+    let deleted = false;
+    mockApi({
+      "GET /monitors/1": () => (deleted ? { status: 404, body: { error: "not found" } } : { status: 200, body: monitor() }),
+      "GET /monitors": { status: 200, body: { monitors: [], ping_available: true } },
+      "GET /monitors/1/incidents?limit=50": { status: 200, body: { incidents: [], events: [] } },
+      "GET /monitors/1/results?*": { status: 200, body: { results: [] } },
+      "DELETE /monitors/1": () => { deleted = true; return { status: 204 }; },
+    });
+    vi.stubGlobal("confirm", () => true);
+    location.hash = "#/uptime/1";
+    renderWithClient(<MonitorDetailPage id={1} isAdmin />);
+    await userEvent.click(await screen.findByRole("button", { name: "Delete" }));
+    await vi.waitFor(() => expect(location.hash).toBe("#/uptime"));
+    expect(deleted).toBe(true);
+    expect(screen.queryByText("Monitor not found.")).toBeNull();
+  });
+});

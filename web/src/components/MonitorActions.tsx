@@ -15,8 +15,11 @@ export function MonitorActions({ m, onEdit }: { m: Monitor; onEdit: () => void }
         {mute.isSuccess ? "Muted for 1 h" : "Mute 1 h"}
       </button>
       <button onClick={onEdit}>Edit</button>
-      <button className="danger" onClick={() => confirm(`Delete ${m.name} and its history?`) &&
-        remove.mutate(m.id, { onSuccess: () => { location.hash = "#/uptime"; } })}>Delete</button>
+      <button className="danger" onClick={() => {
+        if (confirm(`Delete ${m.name} and its history?`)) {
+          remove.mutateAsync(m.id).then(() => { location.hash = "#/uptime"; }, () => {});
+        }
+      }}>Delete</button>
       {err && <span className="error small" role="alert">{err.message}</span>}
     </div>
   );

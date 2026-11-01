@@ -38,7 +38,15 @@ export function useMonitorMutations() {
   return {
     create: useMutation({ mutationFn: createMonitor, onSuccess: changed }),
     update: useMutation({ mutationFn: ({ id, m }: { id: number; m: MonitorInput }) => updateMonitor(id, m), onSuccess: changed }),
-    remove: useMutation({ mutationFn: deleteMonitor, onSuccess: changed }),
+    // A deleted monitor's own query is dropped, not refetched: a refetch
+    // would 404 under the page that is about to navigate away.
+    remove: useMutation({
+      mutationFn: deleteMonitor,
+      onSuccess: (_, id) => {
+        qc.removeQueries({ queryKey: ["monitor", id] });
+        return qc.invalidateQueries({ queryKey: ["monitors"] });
+      },
+    }),
     pause: useMutation({ mutationFn: pauseMonitor, onSuccess: changed }),
     resume: useMutation({ mutationFn: resumeMonitor, onSuccess: changed }),
     check: useMutation({ mutationFn: checkMonitor, onSuccess: () => setTimeout(changed, 3_000) }),
