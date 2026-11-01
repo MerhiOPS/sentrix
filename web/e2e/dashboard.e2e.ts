@@ -30,6 +30,13 @@ test("a host page charts its metrics and switches tabs", async ({ page }) => {
 
 test("logs arrive with secrets redacted before storage", async ({ page }) => {
   await signedIn(page);
+  // The demo emits lines at random and the search view does not refresh by
+  // itself: wait until a line that needed redaction is stored, then open it.
+  const from = new Date(Date.now() - 3_600_000).toISOString();
+  await expect.poll(async () => {
+    const res = await page.request.get(`/api/v1/logs?from=${encodeURIComponent(from)}&to=${encodeURIComponent(new Date().toISOString())}`);
+    return res.ok() ? JSON.stringify(await res.json()) : "";
+  }, { timeout: 45_000 }).toMatch(/\[EMAIL\]|\[REDACTED\]/);
   await page.getByRole("link", { name: "Logs" }).click();
   await expect(page.locator("table.logs tbody tr").first()).toBeVisible();
   const body = page.locator("table.logs");
