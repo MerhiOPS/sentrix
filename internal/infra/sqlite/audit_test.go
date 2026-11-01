@@ -9,17 +9,19 @@ import (
 )
 
 // tenantTables are tables whose rows belong to one tenant.
-var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core|users|sessions|series|samples_detail|process_snapshots|rollup_core_1m|rollup_core_1h|logs|log_usage|redaction_rules|usage_daily|usage_host_days|channels|alert_rules|alert_rule_hosts|alert_rule_channels|alert_states|alert_events|silences)\b`)
+var tenantTables = regexp.MustCompile(`\b(hosts|enrollment_tokens|ingest_batches|host_counters|metrics_core|latest_core|users|sessions|series|samples_detail|process_snapshots|rollup_core_1m|rollup_core_1h|logs|log_usage|redaction_rules|usage_daily|usage_host_days|channels|alert_rules|alert_rule_hosts|alert_rule_channels|alert_states|alert_events|silences|monitors|monitor_channels|monitor_results|monitor_hourly|monitor_incidents|monitor_events)\b`)
 
 // unscopedAllowed are the only statements that may touch tenant tables
 // without a tenant predicate, each because it is how the tenant is *found*.
 var unscopedAllowed = map[string]string{
-	"WHERE h.credential_hash = ?":                                        "agent credential → tenant (AuthenticateCredential)",
-	"WHERE secret_hash = ? AND used_at IS NULL":                          "enrollment token → tenant (RedeemToken)",
-	"WHERE u.email = ?":                                                  "login email → tenant (FindLogin)",
-	"WHERE s.token_hash = ? AND u.disabled_at IS NULL":                   "session cookie → tenant (GetSession)",
-	"FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key": "retention janitor enumerates (tenant, host) under an OpsScope",
-	"WHERE notify = 1 AND outcome = ''":                                  "startup sweep of undelivered alerts, every tenant, under an OpsScope",
+	"WHERE h.credential_hash = ?":                                               "agent credential → tenant (AuthenticateCredential)",
+	"WHERE secret_hash = ? AND used_at IS NULL":                                 "enrollment token → tenant (RedeemToken)",
+	"WHERE u.email = ?":                                                         "login email → tenant (FindLogin)",
+	"WHERE s.token_hash = ? AND u.disabled_at IS NULL":                          "session cookie → tenant (GetSession)",
+	"FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key":        "retention janitor enumerates (tenant, host) under an OpsScope",
+	"WHERE notify = 1 AND outcome = ''":                                         "startup sweep of undelivered alerts and monitor events, every tenant, under an OpsScope",
+	"FROM monitors m JOIN tenants t ON t.key = m.tenant_key WHERE m.paused = 0": "uptime scheduler enumerates every runnable monitor under an OpsScope",
+	"FROM monitors m JOIN tenants t ON t.key = m.tenant_key ORDER BY m.key":     "retention janitor enumerates (tenant, monitor) under an OpsScope",
 }
 
 // auditProblems returns every statement that touches a tenant table without
@@ -86,6 +88,36 @@ func TestStatementAuditCatchesPlantedQuery(t *testing.T) {
 	}
 }
 
+// TestTenantTablesCoverTheSchema: every table with a tenant_key column must
+// be audited. A table added by a migration and missed here would make the
+// audit pass without looking at it.
+func TestTenantTablesCoverTheSchema(t *testing.T) {
+	st := newMigratedStore(t)
+	rows, err := st.db.Reader().Query(`SELECT m.name FROM sqlite_master m, pragma_table_info(m.name) c
+		WHERE m.type = 'table' AND c.name = 'tenant_key' ORDER BY m.name`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		n++
+		if !tenantTables.MatchString(name) || tenantTables.FindString(name) != name {
+			t.Errorf("table %s has a tenant_key column but is not in tenantTables", name)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if n < 20 {
+		t.Fatalf("found %d tenant tables: the schema query is wrong", n)
+	}
+}
+
 // TestStatementAuditOverContract runs the whole contract through the
 // recording driver and fails on any unscoped statement the adapter issued.
 func TestStatementAuditOverContract(t *testing.T) {
@@ -101,5 +133,24 @@ func TestStatementAuditOverContract(t *testing.T) {
 	}
 	for _, p := range auditProblems(stmts) {
 		t.Errorf("unscoped statement on a tenant table: %s", p)
+	}
+}
+
+// TestScheduledColumnsMatch: the scheduler's qualified column lists must
+// be the definition, state and plan columns, in order, or a scan would shift.
+func TestScheduledColumnsMatch(t *testing.T) {
+	cols := func(list, alias string) []string {
+		var out []string
+		for _, c := range strings.Split(list, ",") {
+			out = append(out, alias+strings.TrimSpace(c))
+		}
+		return out
+	}
+	want := append(cols(monitorColumns, "m."), cols(stateColumns, "m.")...)
+	if got := cols(scheduledColumns, ""); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("scheduledColumns = %v\nwant %v", got, want)
+	}
+	if got, want := cols(targetPlanColumns, ""), cols(planColumns, "t."); strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("targetPlanColumns = %v\nwant %v", got, want)
 	}
 }

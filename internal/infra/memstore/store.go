@@ -32,6 +32,7 @@ type Store struct {
 	logUsage   map[usageKey]int64
 	rules      map[domain.TenantID][]domain.RedactionRule
 	alerts     alertData
+	mons       monitorData
 	meter      meter
 	now        func() time.Time
 }
@@ -71,6 +72,7 @@ func New() *Store {
 		logUsage:  map[usageKey]int64{},
 		rules:     map[domain.TenantID][]domain.RedactionRule{},
 		alerts:    newAlertData(),
+		mons:      newMonitorData(),
 		meter:     newMeter(),
 		now:       time.Now,
 	}

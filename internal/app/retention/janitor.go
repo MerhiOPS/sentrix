@@ -49,6 +49,8 @@ type Janitor struct {
 	now   func() time.Time
 	pause func(context.Context, time.Duration) error
 
+	monitors MonitorStore // optional
+
 	mu      sync.Mutex
 	overdue time.Duration
 	lastRun time.Time
@@ -97,6 +99,12 @@ func (j *Janitor) RunOnce(ctx context.Context) (deleted int, err error) {
 				overdue = max(overdue, cutoff.Sub(oldest))
 			}
 		}
+	}
+	n, monOverdue, err := j.pruneMonitors(ctx, ops, now)
+	deleted += n
+	overdue = max(overdue, monOverdue)
+	if err != nil {
+		errs = append(errs, err)
 	}
 	if deleted > 0 {
 		if err := j.store.Compact(ctx, ops); err != nil {

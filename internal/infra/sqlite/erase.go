@@ -96,13 +96,17 @@ func plantUser(ctx context.Context, tx *sql.Tx, tk int64, user domain.UserID, ca
 	return [][]byte{token[:], encID(domain.ID(user)), []byte(email), []byte(pw)}, nil
 }
 
-// plantTenant renames the tenant to the canary, plants it in every host,
-// and returns every host's and user's identifiers as needles.
+// plantTenant renames the tenant to the canary, plants it in every host and
+// in a monitor, and returns every host's, user's and monitor's identifiers
+// as needles (a monitor's target URL can carry customer data).
 func plantTenant(ctx context.Context, tx *sql.Tx, tk int64, canary string, now int64) ([][]byte, error) {
 	if _, err := tx.ExecContext(ctx, `UPDATE tenants SET name = ? WHERE key = ?`, canary, tk); err != nil {
 		return nil, fmt.Errorf("plant tenant canary: %w", err)
 	}
-	var needles [][]byte
+	needles, err := plantMonitors(ctx, tx, tk, canary, now)
+	if err != nil {
+		return nil, err
+	}
 	hosts, err := keysOf(ctx, tx, `SELECT key FROM hosts WHERE tenant_key = ?`, tk)
 	if err != nil {
 		return nil, err
@@ -126,6 +130,34 @@ func plantTenant(ctx context.Context, tx *sql.Tx, tk int64, canary string, now i
 			return nil, err
 		}
 		needles = append(needles, id, []byte(email))
+	}
+	return needles, rows.Err()
+}
+
+// plantMonitors adds a monitor carrying the canary and returns the tenant's
+// monitor targets as needles. A target another tenant also monitors is not
+// a needle: its survival in that tenant's row is not residue. Names are not
+// needles for the same reason; the canary monitor proves the rows went.
+func plantMonitors(ctx context.Context, tx *sql.Tx, tk int64, canary string, now int64) ([][]byte, error) {
+	if _, err := tx.ExecContext(ctx, `INSERT INTO monitors (tenant_key, name, kind, target, interval_ms, timeout_ms,
+		confirm_retries, method, accept_status, keyword, keyword_mode, keyword_case, cert_warn_days, paused, created_at,
+		status, since) VALUES (?, ?, 'http', ?, 60000, 10000, 0, 'GET', '', '', '', 0, 0, 1, ?, 'paused', ?)`,
+		tk, canary, "https://"+canary+".invalid/", now, now); err != nil {
+		return nil, fmt.Errorf("plant monitor canary: %w", err)
+	}
+	rows, err := tx.QueryContext(ctx, `SELECT DISTINCT target FROM monitors WHERE tenant_key = ?1
+		AND target NOT IN (SELECT target FROM monitors WHERE tenant_key <> ?1)`, tk)
+	if err != nil {
+		return nil, fmt.Errorf("list monitor targets: %w", err)
+	}
+	defer rows.Close()
+	var needles [][]byte
+	for rows.Next() {
+		var target string
+		if err := rows.Scan(&target); err != nil {
+			return nil, err
+		}
+		needles = append(needles, []byte(target))
 	}
 	return needles, rows.Err()
 }

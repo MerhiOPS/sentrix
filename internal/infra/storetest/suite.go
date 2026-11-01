@@ -46,6 +46,14 @@ func Run(t *testing.T, newStores Factory) {
 		"alerts/sweep-undelivered":          testSweepUndelivered,
 		"plans/max-hosts-new-only":          testMaxHostsRefusesOnlyNewEnrollments,
 		"plans/metering-write-path":         testMeteringFromWritePath,
+		"monitors/round-trip":               testMonitorRoundTrip,
+		"monitors/quota-and-refs":           testMonitorQuotaAndRefs,
+		"monitors/pause-resume-retarget":    testMonitorPauseResumeAndRetarget,
+		"monitors/scheduled-across-tenants": testScheduledMonitorsAcrossTenants,
+		"monitors/check-cycle":              testMonitorCheckCycle,
+		"monitors/stale-check-refused":      testMonitorStaleCheckRefused,
+		"monitors/sweep-undelivered":        testMonitorSweepUndelivered,
+		"monitors/retention":                testMonitorRetention,
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) { c(t, newStores(t)) })

@@ -177,6 +177,7 @@ func (s *Store) DeleteChannel(_ context.Context, sc domain.Scope, id int64) erro
 		r.v.Channels = slices.DeleteFunc(r.v.Channels, func(c int64) bool { return c == id })
 		s.alerts.rules[k] = r
 	}
+	s.dropChannelFromMonitors(id)
 	return nil
 }
 

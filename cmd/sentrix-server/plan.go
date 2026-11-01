@@ -22,6 +22,8 @@ func tenantPlan(args []string) error {
 	logMB := fs.Int64("log-mb-per-day", 0, "stored log megabytes per day (then logs are shed, metrics kept)")
 	metricsDays := fs.Int("metrics-days", 0, "how long any metric history is kept")
 	logsDays := fs.Int("logs-days", 0, "how long logs are kept")
+	maxMonitors := fs.Int("max-monitors", 0, "uptime monitors allowed (new ones refused beyond it)")
+	minCheck := fs.Duration("min-check-interval", 0, "shortest uptime check interval allowed (30s-24h)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -55,6 +57,10 @@ func tenantPlan(args []string) error {
 			p.MetricsRetentionDays = *metricsDays
 		case "logs-days":
 			p.LogsRetentionDays = *logsDays
+		case "max-monitors":
+			p.MaxMonitors = *maxMonitors
+		case "min-check-interval":
+			p.MinCheckInterval = *minCheck
 		}
 	})
 	if changed {
@@ -65,6 +71,8 @@ func tenantPlan(args []string) error {
 	}
 	fmt.Printf("hosts %d / %d · logs today %d / %d MB · metrics kept %d d · logs kept %d d\n",
 		u.Hosts, p.MaxHosts, u.LogBytesToday>>20, p.LogBytesPerDay>>20, p.MetricsRetentionDays, p.LogsRetentionDays)
-	fmt.Printf("this month: %d samples, %d MB of logs, peak %d hosts on one day\n", u.MonthSamples, u.MonthLogBytes>>20, u.MonthPeakHosts)
+	fmt.Printf("monitors %d / %d · checks every %s at most\n", u.Monitors, p.MaxMonitors, p.MinCheckInterval)
+	fmt.Printf("this month: %d samples, %d MB of logs, peak %d hosts on one day, %d uptime checks\n",
+		u.MonthSamples, u.MonthLogBytes>>20, u.MonthPeakHosts, u.MonthChecks)
 	return closeDB()
 }

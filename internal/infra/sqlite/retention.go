@@ -48,7 +48,7 @@ func (s *Store) RetentionTargets(ctx context.Context, ops domain.OpsScope) ([]re
 		return nil, err
 	}
 	rows, err := s.db.Reader().QueryContext(ctx, `SELECT t.id, h.id, t.max_hosts, t.log_bytes_per_day, t.metrics_retention_days,
-		t.logs_retention_days FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key`)
+		t.logs_retention_days, t.max_monitors, t.min_check_interval_ms FROM hosts h JOIN tenants t ON t.key = h.tenant_key ORDER BY h.key`)
 	if err != nil {
 		return nil, fmt.Errorf("list retention targets: %w", err)
 	}
@@ -56,8 +56,8 @@ func (s *Store) RetentionTargets(ctx context.Context, ops domain.OpsScope) ([]re
 	var out []retention.Target
 	for rows.Next() {
 		var rawT, rawH []byte
-		var p domain.Plan
-		if err := rows.Scan(&rawT, &rawH, &p.MaxHosts, &p.LogBytesPerDay, &p.MetricsRetentionDays, &p.LogsRetentionDays); err != nil {
+		p, err := scanPlan(rows.Scan, &rawT, &rawH)
+		if err != nil {
 			return nil, fmt.Errorf("scan retention target: %w", err)
 		}
 		tid, err := decID(rawT)

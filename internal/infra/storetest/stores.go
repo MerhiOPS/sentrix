@@ -15,6 +15,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/query"
 	"github.com/MerhiOPS/sentrix/internal/app/redaction"
 	"github.com/MerhiOPS/sentrix/internal/app/retention"
+	"github.com/MerhiOPS/sentrix/internal/app/uptime"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
@@ -45,6 +46,12 @@ type Stores interface {
 	alerting.TenantLister
 	alerting.Sweeper
 	retention.Store
+	retention.MonitorStore
+	uptime.MonitorRepo
+	uptime.StateRepo
+	uptime.HistoryReader
+	uptime.ScheduleReader
+	uptime.Sweeper
 }
 
 // Factory builds a fresh, empty adapter for one test.

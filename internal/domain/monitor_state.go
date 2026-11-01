@@ -71,6 +71,10 @@ type MonitorState struct {
 	FirstFailure time.Time // the first of them
 	Cert         CertStatus
 	CertExpiry   *time.Time
+	// Revision changes on every write. A check stores its result only if
+	// the revision it started from is still current: a pause, resume or
+	// edit made while it ran wins over the result.
+	Revision int64
 }
 
 // MonitorEventKind is a notifiable transition.

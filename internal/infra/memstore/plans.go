@@ -16,8 +16,8 @@ type meter struct {
 }
 
 type dayUsage struct {
-	samples, logBytes int64
-	hosts             int
+	samples, logBytes, checks int64
+	hosts                     int
 }
 
 type hostDay struct {
@@ -82,6 +82,12 @@ func (s *Store) GetUsage(_ context.Context, sc domain.Scope, now time.Time) (dom
 			u.MonthSamples += du.samples
 			u.MonthLogBytes += du.logBytes
 			u.MonthPeakHosts = max(u.MonthPeakHosts, du.hosts)
+			u.MonthChecks += du.checks
+		}
+	}
+	for _, m := range s.mons.monitors {
+		if m.tenant == tid {
+			u.Monitors++
 		}
 	}
 	return u, nil

@@ -12,10 +12,17 @@ const (
 	DataRollup1m  DataKind = "rollup_1m"
 	DataRollup1h  DataKind = "rollup_1h"
 	DataLogs      DataKind = "logs"
+
+	DataMonitorResults   DataKind = "monitor_results"   // one row per check
+	DataMonitorHourly    DataKind = "monitor_hourly"    // uptime and latency per hour
+	DataMonitorIncidents DataKind = "monitor_incidents" // closed incidents and monitor events
 )
 
-// DataKinds lists every kind the janitor prunes.
+// DataKinds lists every per-host kind the janitor prunes.
 var DataKinds = []DataKind{DataRawCore, DataDetail, DataProcesses, DataRollup1m, DataRollup1h, DataLogs}
+
+// MonitorDataKinds lists every per-monitor kind the janitor prunes.
+var MonitorDataKinds = []DataKind{DataMonitorResults, DataMonitorHourly, DataMonitorIncidents}
 
 // Retention is how long each kind is kept. Charts keep working past the raw
 // horizon because they switch to rollups (query.plan), so raw data can be
@@ -34,4 +41,10 @@ var DefaultRetention = Retention{
 	DataRollup1m:  30 * day,
 	DataRollup1h:  400 * day,
 	DataLogs:      14 * day,
+	// Raw check results back the response-time charts; the hourly rollup
+	// and incidents back uptime and history, so they live as long as the
+	// metric history does.
+	DataMonitorResults:   30 * day,
+	DataMonitorHourly:    400 * day,
+	DataMonitorIncidents: 400 * day,
 }

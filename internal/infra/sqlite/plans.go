@@ -16,8 +16,9 @@ func (s *Store) SetPlan(ctx context.Context, ops domain.OpsScope, t domain.Tenan
 		return err
 	}
 	res, err := s.db.Writer().ExecContext(ctx, `UPDATE tenants SET max_hosts = ?, log_bytes_per_day = ?,
-		metrics_retention_days = ?, logs_retention_days = ? WHERE id = ?`,
-		p.MaxHosts, p.LogBytesPerDay, p.MetricsRetentionDays, p.LogsRetentionDays, encID(domain.ID(t)))
+		metrics_retention_days = ?, logs_retention_days = ?, max_monitors = ?, min_check_interval_ms = ? WHERE id = ?`,
+		p.MaxHosts, p.LogBytesPerDay, p.MetricsRetentionDays, p.LogsRetentionDays, p.MaxMonitors,
+		p.MinCheckInterval.Milliseconds(), encID(domain.ID(t)))
 	if err != nil {
 		return fmt.Errorf("set plan: %w", err)
 	}
@@ -30,12 +31,23 @@ func (s *Store) GetPlan(ctx context.Context, sc domain.Scope) (domain.Plan, erro
 	if err != nil {
 		return domain.Plan{}, err
 	}
-	var p domain.Plan
-	err = s.db.Reader().QueryRowContext(ctx, `SELECT max_hosts, log_bytes_per_day, metrics_retention_days, logs_retention_days
-		FROM tenants WHERE id = ?`, encID(domain.ID(t))).Scan(&p.MaxHosts, &p.LogBytesPerDay, &p.MetricsRetentionDays, &p.LogsRetentionDays)
+	p, err := scanPlan(s.db.Reader().QueryRowContext(ctx, `SELECT `+planColumns+` FROM tenants WHERE id = ?`,
+		encID(domain.ID(t))).Scan)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.Plan{}, fmt.Errorf("tenant: %w", domain.ErrNotFound)
 	}
+	return p, err
+}
+
+// planColumns are a tenant row's plan, in scanPlan's order.
+const planColumns = `max_hosts, log_bytes_per_day, metrics_retention_days, logs_retention_days, max_monitors, min_check_interval_ms`
+
+func scanPlan(scan func(...any) error, before ...any) (domain.Plan, error) {
+	var p domain.Plan
+	var minCheck int64
+	err := scan(append(before, &p.MaxHosts, &p.LogBytesPerDay, &p.MetricsRetentionDays, &p.LogsRetentionDays,
+		&p.MaxMonitors, &minCheck)...)
+	p.MinCheckInterval = time.Duration(minCheck) * time.Millisecond
 	return p, err
 }
 
@@ -56,11 +68,14 @@ func (s *Store) GetUsage(ctx context.Context, sc domain.Scope, now time.Time) (d
 		tk, today).Scan(&u.LogBytesToday); err != nil {
 		return u, fmt.Errorf("log usage today: %w", err)
 	}
-	err = r.QueryRowContext(ctx, `SELECT coalesce(sum(samples), 0), coalesce(sum(log_bytes), 0), coalesce(max(hosts), 0)
-		FROM usage_daily WHERE tenant_key = ? AND day >= ? AND day <= ?`, tk, monthStart, today).
-		Scan(&u.MonthSamples, &u.MonthLogBytes, &u.MonthPeakHosts)
+	err = r.QueryRowContext(ctx, `SELECT coalesce(sum(samples), 0), coalesce(sum(log_bytes), 0), coalesce(max(hosts), 0),
+		coalesce(sum(checks), 0) FROM usage_daily WHERE tenant_key = ? AND day >= ? AND day <= ?`, tk, monthStart, today).
+		Scan(&u.MonthSamples, &u.MonthLogBytes, &u.MonthPeakHosts, &u.MonthChecks)
 	if err != nil {
 		return u, fmt.Errorf("month usage: %w", err)
+	}
+	if err := r.QueryRowContext(ctx, `SELECT count(*) FROM monitors WHERE tenant_key = ?`, tk).Scan(&u.Monitors); err != nil {
+		return u, fmt.Errorf("count monitors: %w", err)
 	}
 	return u, nil
 }
