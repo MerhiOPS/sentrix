@@ -33,6 +33,12 @@ jobs:
       - name: go build
         run: go build ./...
 
+      # Ping monitors use unprivileged ICMP sockets, as the packaged server
+      # does; the ping test fails (never skips) without them.
+      - name: allow unprivileged ping
+        if: runner.os == 'Linux'
+        run: sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
+
       # Windows code paths are tested on Windows, not just cross-compiled.
       - name: go test (race)
         if: runner.os == 'Linux'
