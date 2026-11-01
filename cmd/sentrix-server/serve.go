@@ -49,6 +49,11 @@ func parseServe(args []string) (serveFlags, error) {
 	if f.uptime.workers < 1 || f.uptime.workers > 1024 {
 		return f, errors.New("--uptime-workers must be 1-1024")
 	}
+	if f.demo {
+		// The demo's monitors check services it runs on loopback; its
+		// data is synthetic, as for the plain-HTTP dashboard below.
+		f.uptime.allowPrivate = true
+	}
 	if f.demo && f.insecure {
 		return f, errors.New("--demo runs its simulated agents over pinned TLS; drop --insecure")
 	}

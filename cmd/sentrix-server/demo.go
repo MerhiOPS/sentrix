@@ -108,6 +108,13 @@ func runDemo(ctx context.Context, st *sqlite.Store, dataDir, ingestListen string
 		}
 		go a.Run(ctx)
 	}
+	targets, err := startDemoTargets(ctx)
+	if err != nil {
+		return fmt.Errorf("demo targets: %w", err)
+	}
+	if err := syncDemoMonitors(ctx, st, sc, targets); err != nil {
+		return err
+	}
 	log.Info("demo running", "hosts", len(demoHosts), "login", demoEmail, "password", s.Password)
 	return nil
 }

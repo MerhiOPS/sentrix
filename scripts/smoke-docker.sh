@@ -1,7 +1,7 @@
 #!/bin/sh
 # Clean-machine acceptance (run by CI): build the image, start
 # the demo, log in, and time how long until every simulated host has live
-# data. Prints the seconds from `docker run` to live charts.
+# data and every demo monitor is up. Prints the seconds from `docker run`.
 set -eu
 IMAGE="${1:-sentrix:smoke}"
 docker build -q -t "$IMAGE" "$(dirname "$0")/.." >/dev/null
@@ -22,9 +22,25 @@ for _ in $(seq 1 120); do
         LIVE=$(curl -sf -b /tmp/sx-jar "$API/hosts" | python3 -c 'import json,sys; print(sum(1 for h in json.load(sys.stdin)["hosts"] if h["latest"]))')
         if [ "$LIVE" -ge 4 ]; then
             python3 -c "print(f'PASS: docker run to login and live data on all 4 hosts: {$(date +%s.%N)-$START:.1f} s')"
-            exit 0
+            break
         fi
     fi
     sleep 0.5
 done
-docker logs "$CID"; echo "FAIL: no live data within 60 s"; exit 1
+[ "${LIVE:-0}" -ge 4 ] || { docker logs "$CID"; echo "FAIL: no live data within 60 s"; exit 1; }
+# The demo's uptime monitors check services on loopback inside the
+# container; every one (ping included, where the runtime allows ping
+# sockets) must come up.
+for _ in $(seq 1 120); do
+    STATE=$(curl -sf -b /tmp/sx-jar "$API/monitors" | python3 -c '
+import json, sys
+ms = json.load(sys.stdin)["monitors"]
+print(len(ms), sum(1 for m in ms if m["state"]["status"] == "up"))')
+    set -- $STATE
+    if [ "$1" -ge 4 ] && [ "$1" -eq "$2" ]; then
+        python3 -c "print(f'PASS: all $1 demo monitors up: {$(date +%s.%N)-$START:.1f} s')"
+        exit 0
+    fi
+    sleep 0.5
+done
+docker logs "$CID"; echo "FAIL: demo monitors not all up within 60 s ($STATE)"; exit 1
