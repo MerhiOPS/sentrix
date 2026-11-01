@@ -69,7 +69,8 @@ type Sweeper interface {
 // UndeliveredReason is recorded on events swept at startup.
 const UndeliveredReason = "server restarted before delivery"
 
-// Message is what a notifier sends.
+// Message is what a notifier sends: an alert transition, or (Monitor set)
+// an uptime monitor event.
 type Message struct {
 	Rule     string
 	Host     string
@@ -78,6 +79,23 @@ type Message struct {
 	Value    *float64
 	At       time.Time
 	Resolved bool
+	Monitor  *MonitorMessage
+}
+
+// MonitorMessage is the uptime part of a message.
+type MonitorMessage struct {
+	Name       string
+	Target     string
+	Event      domain.MonitorEventKind
+	Class      domain.ErrorClass // down: why
+	DownFor    time.Duration     // up: how long it was down
+	CertExpiry *time.Time        // certificate events
+}
+
+// DeliveryRecorder records an event's notification outcome. Alert events
+// record through StateRepo; uptime events bring their own.
+type DeliveryRecorder interface {
+	SetDelivery(ctx context.Context, s domain.Scope, event int64, outcome, delivery string) error
 }
 
 // Notifier delivers a message to one channel.

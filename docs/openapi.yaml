@@ -865,10 +865,11 @@ components:
         outcome: { type: string, enum: ["", delivered, failed], description: Empty while delivery is pending. }
         delivery: { type: string, description: "Per-channel failures, if any." }
     AlertWebhook:
-      description: The body POSTed to a webhook channel.
+      description: The body POSTed to a webhook channel for an alert transition.
       type: object
-      required: [rule, host, state, at, resolved]
+      required: [source, rule, host, state, at, resolved]
       properties:
+        source: { type: string, enum: [alert] }
         rule: { type: string }
         host: { type: string }
         state: { $ref: "#/components/schemas/AlertState" }
@@ -876,6 +877,25 @@ components:
         value: { type: number }
         at: { type: string, format: date-time }
         resolved: { type: boolean }
+    MonitorWebhook:
+      description: The body POSTed to a webhook channel for an uptime monitor event.
+      type: object
+      required: [source, monitor, target, event, at, resolved]
+      additionalProperties: false
+      properties:
+        source: { type: string, enum: [monitor] }
+        monitor: { type: string }
+        target: { type: string }
+        event: { type: string, enum: [down, up, cert_expiring, cert_renewed] }
+        at: { type: string, format: date-time }
+        resolved: { type: boolean, description: True for up and cert_renewed. }
+        error: { $ref: "#/components/schemas/CheckErrorClass" }
+        down_for_s: { type: integer, description: "up: how long the incident lasted." }
+        cert_expires_at: { type: string, format: date-time }
+    CheckErrorClass:
+      type: string
+      description: Why a check failed. The only failure detail stored; never a response body or raw network error.
+      enum: [dns, connect, timeout, tls, status, keyword, blocked, ping_loss]
     System:
       type: object
       required: [server_time, fleet, server]

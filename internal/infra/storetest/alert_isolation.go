@@ -173,6 +173,15 @@ var alertCrossCases = map[string]crossCase{
 		if p := notFound("CreateSilence(B, A's host)", second(st.CreateSilence(ctx, b.scope, onHost))); p != "" {
 			return p
 		}
+		m, _, err := seedMonitor(ctx, st, a)
+		if err != nil {
+			return err.Error()
+		}
+		onMonitor := window
+		onMonitor.Monitor = &m.ID
+		if p := notFound("CreateSilence(B, A's monitor)", second(st.CreateSilence(ctx, b.scope, onMonitor))); p != "" {
+			return p
+		}
 		return notFound("CreateSilence(B, A's rule)", second(st.CreateSilence(ctx, b.scope, onRule)))
 	},
 	"SilenceRepo.DeleteSilence": func(ctx context.Context, st Stores, a, b fixture) string {

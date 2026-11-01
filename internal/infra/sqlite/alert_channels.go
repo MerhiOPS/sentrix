@@ -77,7 +77,7 @@ func (s *Store) ListSilences(ctx context.Context, sc domain.Scope) ([]domain.Sil
 	if err != nil {
 		return nil, err
 	}
-	rows, err := r.QueryContext(ctx, `SELECT s.key, s.rule_key, h.id, s.starts, s.ends, s.reason FROM silences s
+	rows, err := r.QueryContext(ctx, `SELECT s.key, s.rule_key, h.id, s.monitor_key, s.starts, s.ends, s.reason FROM silences s
 		LEFT JOIN hosts h ON h.tenant_key = s.tenant_key AND h.key = s.host_key
 		WHERE s.tenant_key = ? ORDER BY s.key`, tk)
 	if err != nil {
@@ -87,14 +87,17 @@ func (s *Store) ListSilences(ctx context.Context, sc domain.Scope) ([]domain.Sil
 	var out []domain.Silence
 	for rows.Next() {
 		var sil domain.Silence
-		var rule sql.NullInt64
+		var rule, monitor sql.NullInt64
 		var host []byte
 		var starts, ends int64
-		if err := rows.Scan(&sil.ID, &rule, &host, &starts, &ends, &sil.Reason); err != nil {
+		if err := rows.Scan(&sil.ID, &rule, &host, &monitor, &starts, &ends, &sil.Reason); err != nil {
 			return nil, fmt.Errorf("scan silence: %w", err)
 		}
 		if rule.Valid {
 			sil.Rule = &rule.Int64
+		}
+		if monitor.Valid {
+			sil.Monitor = &monitor.Int64
 		}
 		if host != nil {
 			id, err := decID(host)
@@ -119,7 +122,20 @@ func (s *Store) CreateSilence(ctx context.Context, sc domain.Scope, sil domain.S
 		if err != nil {
 			return err
 		}
-		var rule, host any
+		var rule, host, monitor any
+		if sil.Monitor != nil {
+			// The column cannot carry a composite foreign key (0007), so
+			// ownership is checked here, inside the tenant.
+			var one int
+			err := tx.QueryRowContext(ctx, `SELECT 1 FROM monitors WHERE tenant_key = ? AND key = ?`, tk, *sil.Monitor).Scan(&one)
+			if errors.Is(err, sql.ErrNoRows) {
+				return fmt.Errorf("monitor: %w", domain.ErrNotFound)
+			}
+			if err != nil {
+				return err
+			}
+			monitor = *sil.Monitor
+		}
 		if sil.Rule != nil {
 			if err := ruleExists(ctx, tx, tk, *sil.Rule); err != nil {
 				return err
@@ -131,8 +147,8 @@ func (s *Store) CreateSilence(ctx context.Context, sc domain.Scope, sil domain.S
 				return err
 			}
 		}
-		res, err := tx.ExecContext(ctx, `INSERT INTO silences (tenant_key, rule_key, host_key, starts, ends, reason)
-			VALUES (?, ?, ?, ?, ?, ?)`, tk, rule, host, encTime(sil.Starts), encTime(sil.Ends), sil.Reason)
+		res, err := tx.ExecContext(ctx, `INSERT INTO silences (tenant_key, rule_key, host_key, monitor_key, starts, ends, reason)
+			VALUES (?, ?, ?, ?, ?, ?, ?)`, tk, rule, host, monitor, encTime(sil.Starts), encTime(sil.Ends), sil.Reason)
 		if err != nil {
 			return fmt.Errorf("insert silence: %w", err)
 		}

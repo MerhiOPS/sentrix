@@ -134,9 +134,11 @@ func testAlertSilenceRoundTrip(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
 	rule, _ := st.CreateRule(ctx, f.scope, alertRule(nil, nil))
 	host := f.host
+	mon := mustMonitor(t, st, f.scope, monitor())
 	want := []domain.Silence{
 		{Starts: T0, Ends: T0.Add(time.Hour), Reason: "everything"},
 		{Rule: &rule, Host: &host, Starts: T0, Ends: T0.Add(2 * time.Hour), Reason: "patching"},
+		{Monitor: &mon, Starts: T0, Ends: T0.Add(time.Hour), Reason: "shop migration"},
 	}
 	for i := range want {
 		id, err := st.CreateSilence(ctx, f.scope, want[i])
@@ -151,6 +153,15 @@ func testAlertSilenceRoundTrip(t *testing.T, st Stores) {
 	}
 	if _, err := st.CreateSilence(ctx, f.scope, domain.Silence{Host: ptr(domain.NewHostID()), Starts: T0, Ends: T0.Add(time.Hour)}); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("silence for an unknown host: %v", err)
+	}
+	if _, err := st.CreateSilence(ctx, f.scope, domain.Silence{Monitor: ptr(mon + 999), Starts: T0, Ends: T0.Add(time.Hour)}); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("silence for an unknown monitor: %v", err)
+	}
+	if err := st.DeleteMonitor(ctx, f.scope, mon); err != nil {
+		t.Fatal(err)
+	}
+	if got := must(st.ListSilences(ctx, f.scope)); len(got) != 2 {
+		t.Fatalf("a deleted monitor's silence survived: %+v", got)
 	}
 	if err := st.DeleteSilence(ctx, f.scope, want[0].ID); err != nil {
 		t.Fatal(err)

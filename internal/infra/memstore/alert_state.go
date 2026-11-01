@@ -39,6 +39,11 @@ func (s *Store) CreateSilence(_ context.Context, sc domain.Scope, sil domain.Sil
 			return 0, err
 		}
 	}
+	if sil.Monitor != nil {
+		if _, _, err := s.monitorIn(sc, *sil.Monitor); err != nil {
+			return 0, err
+		}
+	}
 	s.alerts.next++
 	sil.ID = s.alerts.next
 	s.alerts.silences[sil.ID] = owned[domain.Silence]{tid, sil}

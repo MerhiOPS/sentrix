@@ -30,9 +30,17 @@ func (n *Notifier) Notify(ctx context.Context, ch domain.Channel, m alerting.Mes
 	var err error
 	switch ch.Kind {
 	case domain.ChannelSlack:
-		body, err = json.Marshal(map[string]string{"text": slackText(m)})
+		text := slackText(m)
+		if m.Monitor != nil {
+			text = slackMonitorText(*m.Monitor, m.At)
+		}
+		body, err = json.Marshal(map[string]string{"text": text})
 	case domain.ChannelWebhook:
-		body, err = json.Marshal(webhookBody(m))
+		if m.Monitor != nil {
+			body, err = json.Marshal(monitorBody(*m.Monitor, m.At))
+		} else {
+			body, err = json.Marshal(webhookBody(m))
+		}
 	default:
 		return fmt.Errorf("unknown channel kind %q", ch.Kind)
 	}
@@ -42,9 +50,11 @@ func (n *Notifier) Notify(ctx context.Context, ch domain.Channel, m alerting.Mes
 	return n.p.post(ctx, ch.URL, body)
 }
 
-// webhookPayload is the documented webhook body (docs/openapi.yaml,
-// AlertWebhook).
+// webhookPayload is the documented alert webhook body (docs/openapi.yaml,
+// AlertWebhook). Source was added with uptime monitoring; every other
+// field is unchanged.
 type webhookPayload struct {
+	Source   string   `json:"source"`
 	Rule     string   `json:"rule"`
 	Host     string   `json:"host"`
 	State    string   `json:"state"`
@@ -55,7 +65,7 @@ type webhookPayload struct {
 }
 
 func webhookBody(m alerting.Message) webhookPayload {
-	return webhookPayload{Rule: m.Rule, Host: m.Host, State: string(m.State), Metric: m.Metric, Value: m.Value,
+	return webhookPayload{Source: "alert", Rule: m.Rule, Host: m.Host, State: string(m.State), Metric: m.Metric, Value: m.Value,
 		At: m.At.UTC().Format(time.RFC3339), Resolved: m.Resolved}
 }
 

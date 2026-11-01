@@ -57,23 +57,32 @@ func ValidateChannel(c Channel) error {
 	return nil
 }
 
-// Silence suppresses notifications — never transitions — for a rule, a
-// host, or both, within [Starts, Ends).
+// Silence suppresses notifications — never transitions — within
+// [Starts, Ends): for a rule, a host or both, or for one monitor. A silence
+// naming nothing covers every alert and every monitor.
 type Silence struct {
-	ID     int64
-	Rule   *int64  // nil: every rule
-	Host   *HostID // nil: every host
-	Starts time.Time
-	Ends   time.Time
-	Reason string
+	ID      int64
+	Rule    *int64  // nil: every rule
+	Host    *HostID // nil: every host
+	Monitor *int64  // set: this monitor only, and no alert
+	Starts  time.Time
+	Ends    time.Time
+	Reason  string
 }
 
-// Covers reports whether the silence applies to (rule, host) at t.
+func (s Silence) activeAt(t time.Time) bool { return !t.Before(s.Starts) && t.Before(s.Ends) }
+
+// Covers reports whether the silence applies to alert (rule, host) at t.
 func (s Silence) Covers(rule int64, host HostID, t time.Time) bool {
-	if t.Before(s.Starts) || !t.Before(s.Ends) {
+	return s.activeAt(t) && s.Monitor == nil && (s.Rule == nil || *s.Rule == rule) && (s.Host == nil || *s.Host == host)
+}
+
+// CoversMonitor reports whether the silence applies to a monitor at t.
+func (s Silence) CoversMonitor(monitor int64, t time.Time) bool {
+	if !s.activeAt(t) || s.Rule != nil || s.Host != nil {
 		return false
 	}
-	return (s.Rule == nil || *s.Rule == rule) && (s.Host == nil || *s.Host == host)
+	return s.Monitor == nil || *s.Monitor == monitor
 }
 
 // ValidateSilence checks a silence.
@@ -83,6 +92,9 @@ func ValidateSilence(s Silence) error {
 	}
 	if len(s.Reason) > 200 {
 		return fmt.Errorf("%w: reason too long", ErrInvalid)
+	}
+	if s.Monitor != nil && (s.Rule != nil || s.Host != nil) {
+		return fmt.Errorf("%w: a silence names a monitor, or a rule and host, not both", ErrInvalid)
 	}
 	return nil
 }

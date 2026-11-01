@@ -2,6 +2,7 @@ package alerting
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"testing"
@@ -182,5 +183,27 @@ func TestNoDataRuleFromLastSeen(t *testing.T) {
 	}
 	if len(w.f.events) != 1 || w.f.events[0].Value != nil {
 		t.Fatalf("events %+v, want one valueless firing", w.f.events)
+	}
+}
+
+// recorderFunc records deliveries for a job that brings its own recorder.
+type recorderFunc func(event int64, outcome string)
+
+func (r recorderFunc) SetDelivery(_ context.Context, _ domain.Scope, event int64, outcome, _ string) error {
+	r(event, outcome)
+	return nil
+}
+
+func TestJobRecorderReceivesTheOutcome(t *testing.T) {
+	w := newWorld(t)
+	w.f.events = append(w.f.events, domain.AlertEvent{ID: 1})
+	var got []string
+	rec := recorderFunc(func(event int64, outcome string) { got = append(got, fmt.Sprint(event, outcome)) })
+	w.d.Deliver(context.Background(), Job{Event: 42, Channels: w.f.channels, Recorder: rec})
+	if len(got) != 1 || got[0] != "42"+OutcomeDelivered {
+		t.Fatalf("recorded %v, want event 42 delivered through the job's recorder", got)
+	}
+	if w.f.events[0].Outcome != "" {
+		t.Fatal("a job with its own recorder wrote into the alert events")
 	}
 }

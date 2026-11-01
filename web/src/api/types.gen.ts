@@ -766,8 +766,10 @@ export interface components {
             /** @description Per-channel failures, if any. */
             delivery: string;
         };
-        /** @description The body POSTed to a webhook channel. */
+        /** @description The body POSTed to a webhook channel for an alert transition. */
         AlertWebhook: {
+            /** @enum {string} */
+            source: "alert";
             rule: string;
             host: string;
             state: components["schemas"]["AlertState"];
@@ -777,6 +779,29 @@ export interface components {
             at: string;
             resolved: boolean;
         };
+        /** @description The body POSTed to a webhook channel for an uptime monitor event. */
+        MonitorWebhook: {
+            /** @enum {string} */
+            source: "monitor";
+            monitor: string;
+            target: string;
+            /** @enum {string} */
+            event: "down" | "up" | "cert_expiring" | "cert_renewed";
+            /** Format: date-time */
+            at: string;
+            /** @description True for up and cert_renewed. */
+            resolved: boolean;
+            error?: components["schemas"]["CheckErrorClass"];
+            /** @description up: how long the incident lasted. */
+            down_for_s?: number;
+            /** Format: date-time */
+            cert_expires_at?: string;
+        };
+        /**
+         * @description Why a check failed. The only failure detail stored; never a response body or raw network error.
+         * @enum {string}
+         */
+        CheckErrorClass: "dns" | "connect" | "timeout" | "tls" | "status" | "keyword" | "blocked" | "ping_loss";
         System: {
             /** Format: date-time */
             server_time: string;

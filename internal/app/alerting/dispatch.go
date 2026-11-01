@@ -27,6 +27,8 @@ type Job struct {
 	Event    int64
 	Channels []domain.Channel
 	Message  Message
+	// Recorder stores the outcome; nil means the alert StateRepo.
+	Recorder DeliveryRecorder
 }
 
 // Dispatcher delivers notifications off the evaluation path: a slow or dead
@@ -101,8 +103,12 @@ func (d *Dispatcher) record(ctx context.Context, j Job, outcome, detail string) 
 	// The outcome must land even when shutdown cancelled the delivery.
 	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 	defer cancel()
-	if err := d.states.SetDelivery(ctx, j.Scope, j.Event, outcome, detail); err != nil {
-		d.log.Error("record alert delivery", "event", j.Event, "err", err)
+	var rec DeliveryRecorder = d.states
+	if j.Recorder != nil {
+		rec = j.Recorder
+	}
+	if err := rec.SetDelivery(ctx, j.Scope, j.Event, outcome, detail); err != nil {
+		d.log.Error("record delivery", "event", j.Event, "err", err)
 	}
 }
 

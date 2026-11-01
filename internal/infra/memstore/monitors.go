@@ -165,6 +165,11 @@ func (s *Store) DeleteMonitor(_ context.Context, sc domain.Scope, id int64) erro
 		return err
 	}
 	delete(s.mons.monitors, id)
+	for sid, sil := range s.alerts.silences { // the schema cascades these
+		if sil.v.Monitor != nil && *sil.v.Monitor == id {
+			delete(s.alerts.silences, sid)
+		}
+	}
 	return nil
 }
 
