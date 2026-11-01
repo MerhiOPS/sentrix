@@ -22,6 +22,7 @@ const janitorEvery = 10 * time.Minute
 // startJanitor runs retention once at start and then periodically.
 func startJanitor(ctx context.Context, st *sqlite.Store) *retention.Janitor {
 	j := retention.New(st, domain.DefaultRetention, time.Now)
+	j.SetMonitorStore(st)
 	log := slog.Default().With("component", "retention")
 	run := func() {
 		n, err := j.RunOnce(ctx)

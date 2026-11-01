@@ -22,6 +22,8 @@ type serveFlags struct {
 	data, listen, apiListen, origins string
 	insecure, apiTLS, demo           bool
 	tls                              tlsFlags
+	uptime                           uptimeOptions
+	uptimeRefs                       string
 }
 
 func parseServe(args []string) (serveFlags, error) {
@@ -34,9 +36,18 @@ func parseServe(args []string) (serveFlags, error) {
 	fs.BoolVar(&f.apiTLS, "api-tls", false, "serve the dashboard over TLS (required off loopback)")
 	fs.StringVar(&f.origins, "api-origins", "", "extra allowed origins, comma-separated (dev server)")
 	fs.BoolVar(&f.demo, "demo", false, "seed a demo tenant and run simulated hosts through the real ingest path")
+	fs.IntVar(&f.uptime.workers, "uptime-workers", 64, "uptime checks running at once (each tenant gets at most a quarter)")
+	fs.BoolVar(&f.uptime.allowPrivate, "uptime-allow-private", false,
+		"let uptime checks reach loopback and private addresses (single-company installs; cloud metadata stays blocked)")
+	fs.StringVar(&f.uptimeRefs, "uptime-reference", "",
+		"comma-separated URLs that should always answer; when none does, failed checks are recorded as unknown")
 	f.tls.register(fs)
 	if err := fs.Parse(args); err != nil {
 		return f, err
+	}
+	f.uptime.references = splitList(f.uptimeRefs)
+	if f.uptime.workers < 1 || f.uptime.workers > 1024 {
+		return f, errors.New("--uptime-workers must be 1-1024")
 	}
 	if f.demo && f.insecure {
 		return f, errors.New("--demo runs its simulated agents over pinned TLS; drop --insecure")
@@ -76,7 +87,7 @@ func serve(args []string) error {
 			slog.Info("self-signed TLS", "spki_pin", hex.EncodeToString(pin))
 		}
 	}
-	h, err := build(ctx, st, f.data, pin, splitList(f.origins))
+	h, err := build(ctx, st, f.data, pin, splitList(f.origins), f.uptime)
 	if err != nil {
 		return errors.Join(err, closeDB())
 	}

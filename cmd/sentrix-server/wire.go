@@ -44,7 +44,7 @@ type handlers struct {
 }
 
 // build wires every use case onto the store. pin is nil in CA mode.
-func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, extraOrigins []string) (handlers, error) {
+func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, extraOrigins []string, up uptimeOptions) (handlers, error) {
 	hub := livehub.New()
 	svc := ingest.NewService(st, ingest.DefaultWindow, time.Now)
 	svc.SetPublisher(hub)
@@ -82,5 +82,6 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Now:          time.Now,
 	})
 	startAlerting(ctx, st)
+	startUptime(ctx, st, up)
 	return handlers{ingest: ingestH, dashboard: api}, nil
 }
