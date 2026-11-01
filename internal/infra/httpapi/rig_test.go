@@ -21,6 +21,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
 	"github.com/MerhiOPS/sentrix/internal/app/redaction"
+	"github.com/MerhiOPS/sentrix/internal/app/uptime"
 	"github.com/MerhiOPS/sentrix/internal/domain"
 	"github.com/MerhiOPS/sentrix/internal/infra/livehub"
 	"github.com/MerhiOPS/sentrix/internal/infra/memstore"
@@ -49,6 +50,8 @@ type rig struct {
 	notReady error // what the readiness probe reports
 	router   routers.Router
 	a, b     tenantRig
+	sched    *fakeSched
+	noPing   error // what PingAvailable reports
 }
 
 const testPassword = "correct horse battery staple"
@@ -70,7 +73,12 @@ func newRig(t *testing.T) *rig {
 	r.a = seedTenant(t, st, hasher, "a")
 	r.b = seedTenant(t, st, hasher, "b")
 	r.auth = ingest.NewAuthenticator(st, time.Minute, 100, time.Now)
+	r.sched = &fakeSched{}
+	ping := func() error { return r.noPing }
+	monitors := uptime.NewAdmin(uptime.AdminDeps{Monitors: st, States: st, History: st, Plans: st, Sched: r.sched,
+		PingAvailable: ping, Now: time.Now})
 	api := New(Config{
+		Monitors: monitors, PingAvailable: ping,
 		Sessions: sessions, Users: st, Tokens: identity.NewEnrollment(st, time.Now),
 		Hosts: st, Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: r.hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, r.redactor),

@@ -452,6 +452,153 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+  /monitors:
+    get:
+      operationId: listMonitors
+      description: |
+        Every uptime monitor with its state, uptime over 24 h and 30 d and
+        the last 30 daily bars. Uptime is up / (up + down) over monitored
+        time: paused periods and gaps when the server was not checking
+        count as neither, so it is absent (null) when nothing was monitored.
+      responses:
+        "200":
+          description: The tenant's monitors.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MonitorList" }
+        "401": { $ref: "#/components/responses/Error" }
+    post:
+      operationId: createMonitor
+      description: |
+        Admin only. Checked from the server. Private and loopback targets are
+        refused at connection time unless the operator allows them; cloud
+        metadata addresses always are. Refused with 429 at the plan's
+        max_monitors, and an interval below its min_check_interval is 400.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MonitorInput" }
+      responses:
+        "201":
+          description: Created; the first check runs at once.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Monitor" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    get:
+      operationId: getMonitor
+      description: One monitor with uptime over 24 h, 7 d, 30 d and 90 d and 90 daily bars.
+      responses:
+        "200":
+          description: The monitor.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Monitor" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    put:
+      operationId: updateMonitor
+      description: Admin only. A new kind or target starts the state over and ends any open incident.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/MonitorInput" }
+      responses:
+        "200":
+          description: Updated.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Monitor" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    delete:
+      operationId: deleteMonitor
+      description: Admin only. Removes the monitor with its history.
+      responses:
+        "204": { description: Deleted. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}/pause:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    post:
+      operationId: pauseMonitor
+      description: Admin only. Stops checking; an open incident ends now. Paused time does not count against uptime.
+      responses:
+        "204": { description: Paused (or already paused). }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}/resume:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    post:
+      operationId: resumeMonitor
+      description: Admin only. Starts checking again from state pending.
+      responses:
+        "204": { description: Resumed (or already running). }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}/check:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    post:
+      operationId: checkMonitorNow
+      description: Admin only. Runs a check at once; at most every 10 s per monitor (429), never while one runs (409).
+      responses:
+        "202": { description: The check is queued; its result appears in the results. }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}/results:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    get:
+      operationId: listMonitorResults
+      description: Checks in [from, to), oldest first; at most 7 days, the newest 20 000 when there are more.
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date-time } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date-time } }
+      responses:
+        "200":
+          description: The checks.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/CheckResultList" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+  /monitors/{mid}/incidents:
+    parameters:
+      - $ref: "#/components/parameters/MonitorID"
+    get:
+      operationId: listMonitorIncidents
+      description: The newest incidents and notification events, newest first.
+      parameters:
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 500 } }
+      responses:
+        "200":
+          description: Incidents and events.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/IncidentList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
   /system:
     get:
       operationId: getSystem
@@ -519,6 +666,11 @@ components:
       in: path
       required: true
       schema: { type: string, format: uuid }
+    MonitorID:
+      name: mid
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
   responses:
     Error:
       description: An error.
@@ -815,16 +967,18 @@ components:
       properties:
         rule_id: { type: integer, format: int64, nullable: true }
         host_id: { type: string, format: uuid, nullable: true }
+        monitor_id: { type: integer, format: int64, nullable: true, description: "This monitor only; not with rule_id or host_id." }
         starts: { type: string, format: date-time }
         ends: { type: string, format: date-time }
         reason: { type: string, maxLength: 200 }
     Silence:
       type: object
-      required: [id, rule_id, host_id, starts, ends, reason]
+      required: [id, rule_id, host_id, monitor_id, starts, ends, reason]
       properties:
         id: { type: integer, format: int64 }
         rule_id: { type: integer, format: int64, nullable: true }
         host_id: { type: string, format: uuid, nullable: true }
+        monitor_id: { type: integer, format: int64, nullable: true }
         starts: { type: string, format: date-time }
         ends: { type: string, format: date-time }
         reason: { type: string }
@@ -877,6 +1031,129 @@ components:
         value: { type: number }
         at: { type: string, format: date-time }
         resolved: { type: boolean }
+    MonitorKind:
+      type: string
+      enum: [http, tcp, ping]
+    MonitorInput:
+      type: object
+      additionalProperties: false
+      required: [name, kind, target, interval_s]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        kind: { $ref: "#/components/schemas/MonitorKind" }
+        target: { type: string, description: "http: an http(s) URL; tcp: host:port; ping: a host name or IP address." }
+        interval_s: { type: integer, minimum: 30, maximum: 86400 }
+        timeout_s: { type: integer, minimum: 1, maximum: 30, description: "Default 10 (capped below the interval)." }
+        confirm_retries: { type: integer, minimum: 0, maximum: 3, description: "Quick re-checks that must also fail before an incident opens. Default 1." }
+        method: { type: string, enum: [GET, HEAD], description: "http only. Default GET." }
+        accept_status: { type: string, description: 'http only: accepted final status codes, e.g. "200-299,301". Default 200-399.' }
+        keyword: { type: string, maxLength: 200 }
+        keyword_mode: { type: string, enum: ["", present, absent] }
+        keyword_case_sensitive: { type: boolean }
+        cert_warn_days: { type: integer, minimum: 0, maximum: 365, description: "https only: warn this many days before the certificate chain expires; 0 turns warnings off. Default 14 for https." }
+        channels: { type: array, items: { type: integer, format: int64 } }
+    Monitor:
+      type: object
+      required: [id, name, kind, target, interval_s, timeout_s, confirm_retries, method, accept_status, keyword, keyword_mode,
+        keyword_case_sensitive, cert_warn_days, channels, paused, created_at, state, uptime, avg_latency_ms, bars]
+      properties:
+        id: { type: integer, format: int64 }
+        name: { type: string }
+        kind: { $ref: "#/components/schemas/MonitorKind" }
+        target: { type: string }
+        interval_s: { type: integer }
+        timeout_s: { type: integer }
+        confirm_retries: { type: integer }
+        method: { type: string }
+        accept_status: { type: string }
+        keyword: { type: string }
+        keyword_mode: { type: string, enum: ["", present, absent] }
+        keyword_case_sensitive: { type: boolean }
+        cert_warn_days: { type: integer }
+        channels: { type: array, items: { type: integer, format: int64 } }
+        paused: { type: boolean }
+        created_at: { type: string, format: date-time }
+        state: { $ref: "#/components/schemas/MonitorState" }
+        uptime:
+          type: object
+          description: Uptime ratio (0-1) per window; a window is absent when nothing in it was monitored.
+          properties:
+            "24h": { type: number }
+            "7d": { type: number }
+            "30d": { type: number }
+            "90d": { type: number }
+        avg_latency_ms: { type: integer, nullable: true, description: Mean over the last 24 h of checks that measured one. }
+        bars: { type: array, items: { $ref: "#/components/schemas/DayBar" } }
+    MonitorState:
+      type: object
+      required: [status, since, last_check, failures, cert_status, cert_expires_at]
+      properties:
+        status: { type: string, enum: [pending, up, down, paused] }
+        since: { type: string, format: date-time, description: "down: the first failed check of the incident." }
+        last_check: { type: string, format: date-time, nullable: true }
+        failures: { type: integer, description: Consecutive failed checks. }
+        cert_status: { type: string, enum: [ok, expiring], nullable: true }
+        cert_expires_at: { type: string, format: date-time, nullable: true }
+    DayBar:
+      type: object
+      required: [day, up_s, down_s, failures]
+      properties:
+        day: { type: string, format: date }
+        up_s: { type: integer }
+        down_s: { type: integer, description: "Both zero: the day was not monitored (a gap, not 100 %)." }
+        failures: { type: integer }
+    MonitorList:
+      type: object
+      required: [monitors, ping_available]
+      properties:
+        monitors: { type: array, items: { $ref: "#/components/schemas/Monitor" } }
+        ping_available: { type: boolean, description: Whether this server can run ping monitors. }
+    CheckResult:
+      type: object
+      required: [at, outcome, error, latency_ms, ttfb_ms, status, loss, cert_expires_at]
+      properties:
+        at: { type: string, format: date-time }
+        outcome: { type: string, enum: [up, down, unknown], description: "unknown: the server's own network was down." }
+        error: { allOf: [{ $ref: "#/components/schemas/CheckErrorClass" }], nullable: true }
+        latency_ms: { type: integer, nullable: true }
+        ttfb_ms: { type: integer, nullable: true }
+        status: { type: integer, nullable: true }
+        loss: { type: integer, nullable: true, description: "ping: percent of echoes lost." }
+        cert_expires_at: { type: string, format: date-time, nullable: true }
+    CheckResultList:
+      type: object
+      required: [results]
+      properties:
+        results: { type: array, items: { $ref: "#/components/schemas/CheckResult" } }
+    Incident:
+      type: object
+      required: [id, started, ended, error, failures, duration_s]
+      properties:
+        id: { type: integer, format: int64 }
+        started: { type: string, format: date-time }
+        ended: { type: string, format: date-time, nullable: true }
+        error: { $ref: "#/components/schemas/CheckErrorClass" }
+        failures: { type: integer }
+        duration_s: { type: integer, description: "To the end, or to now while open." }
+    MonitorEvent:
+      type: object
+      required: [id, kind, at, error, down_for_s, cert_expires_at, notified, outcome, delivery]
+      properties:
+        id: { type: integer, format: int64 }
+        kind: { type: string, enum: [down, up, cert_expiring, cert_renewed] }
+        at: { type: string, format: date-time }
+        error: { allOf: [{ $ref: "#/components/schemas/CheckErrorClass" }], nullable: true }
+        down_for_s: { type: integer, nullable: true }
+        cert_expires_at: { type: string, format: date-time, nullable: true }
+        notified: { type: boolean }
+        outcome: { type: string, enum: ["", delivered, failed] }
+        delivery: { type: string }
+    IncidentList:
+      type: object
+      required: [incidents, events]
+      properties:
+        incidents: { type: array, items: { $ref: "#/components/schemas/Incident" } }
+        events: { type: array, items: { $ref: "#/components/schemas/MonitorEvent" } }
     MonitorWebhook:
       description: The body POSTed to a webhook channel for an uptime monitor event.
       type: object
@@ -916,8 +1193,21 @@ components:
             agent_dropped_total: { type: integer, description: "Batches agents dropped (WAL full, too old, refused)." }
         server:
           type: object
-          required: [db_bytes, db_wal_bytes, disk_free_ratio, ttl_overdue_s, janitor_last_run, ws_subscribers, ws_dropped, writer_waits, writer_wait_ms]
+          required: [db_bytes, db_wal_bytes, disk_free_ratio, ttl_overdue_s, janitor_last_run, ws_subscribers, ws_dropped, writer_waits, writer_wait_ms, uptime]
           properties:
+            uptime:
+              type: object
+              description: Uptime checking across every tenant.
+              required: [monitors, running, checks, skipped, stale, max_lateness_ms, references_configured, ping_available]
+              properties:
+                monitors: { type: integer, description: Monitors being scheduled (unpaused). }
+                running: { type: integer }
+                checks: { type: integer, description: Checks run since start. }
+                skipped: { type: integer, description: Checks dropped because no worker was free for a whole interval; should stay 0. }
+                stale: { type: integer, description: Results discarded because the monitor changed while it was checked. }
+                max_lateness_ms: { type: integer, description: "Worst delay between a check being due and starting, since start." }
+                references_configured: { type: boolean, description: "Without references, the server's own outage reports every monitor down." }
+                ping_available: { type: boolean }
             db_bytes: { type: integer }
             db_wal_bytes: { type: integer }
             disk_free_ratio: { type: number, nullable: true }
@@ -933,16 +1223,20 @@ components:
       properties:
         plan:
           type: object
-          required: [max_hosts, log_bytes_per_day, metrics_retention_days, logs_retention_days]
+          required: [max_hosts, log_bytes_per_day, metrics_retention_days, logs_retention_days, max_monitors, min_check_interval_s]
           properties:
+            max_monitors: { type: integer, description: Uptime monitors allowed; beyond it new monitors are refused. }
+            min_check_interval_s: { type: integer, description: Shortest check interval a monitor may use. }
             max_hosts: { type: integer, description: Enabled hosts allowed; beyond it new enrollments are refused. }
             log_bytes_per_day: { type: integer, format: int64 }
             metrics_retention_days: { type: integer }
             logs_retention_days: { type: integer }
         usage:
           type: object
-          required: [hosts, log_bytes_today, month_samples, month_log_bytes, month_peak_hosts]
+          required: [hosts, log_bytes_today, month_samples, month_log_bytes, month_peak_hosts, monitors, month_checks]
           properties:
+            monitors: { type: integer }
+            month_checks: { type: integer, format: int64, description: Uptime checks stored this month. }
             hosts: { type: integer }
             log_bytes_today: { type: integer, format: int64 }
             month_samples: { type: integer, format: int64 }

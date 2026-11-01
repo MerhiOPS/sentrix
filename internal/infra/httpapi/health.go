@@ -10,15 +10,28 @@ import (
 
 // ServerStats is the process-wide half of the system report.
 type ServerStats struct {
-	DBBytes        int64      `json:"db_bytes"`
-	DBWALBytes     int64      `json:"db_wal_bytes"`
-	DiskFreeRatio  *float64   `json:"disk_free_ratio"`
-	TTLOverdueS    int64      `json:"ttl_overdue_s"`
-	JanitorLastRun *time.Time `json:"janitor_last_run"`
-	WSSubscribers  int        `json:"ws_subscribers"`
-	WSDropped      uint64     `json:"ws_dropped"`
-	WriterWaits    int64      `json:"writer_waits"`
-	WriterWaitMS   int64      `json:"writer_wait_ms"`
+	DBBytes        int64       `json:"db_bytes"`
+	DBWALBytes     int64       `json:"db_wal_bytes"`
+	DiskFreeRatio  *float64    `json:"disk_free_ratio"`
+	TTLOverdueS    int64       `json:"ttl_overdue_s"`
+	JanitorLastRun *time.Time  `json:"janitor_last_run"`
+	WSSubscribers  int         `json:"ws_subscribers"`
+	WSDropped      uint64      `json:"ws_dropped"`
+	WriterWaits    int64       `json:"writer_waits"`
+	WriterWaitMS   int64       `json:"writer_wait_ms"`
+	Uptime         UptimeStats `json:"uptime"`
+}
+
+// UptimeStats is how uptime checking is keeping up, across tenants.
+type UptimeStats struct {
+	Monitors             int    `json:"monitors"`
+	Running              int    `json:"running"`
+	Checks               uint64 `json:"checks"`
+	Skipped              uint64 `json:"skipped"`
+	Stale                uint64 `json:"stale"`
+	MaxLatenessMS        int64  `json:"max_lateness_ms"`
+	ReferencesConfigured bool   `json:"references_configured"`
+	PingAvailable        bool   `json:"ping_available"`
 }
 
 // fleetStats is the tenant half: computed from the tenant's own hosts.

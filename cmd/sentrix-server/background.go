@@ -50,7 +50,8 @@ func startJanitor(ctx context.Context, st *sqlite.Store) *retention.Janitor {
 }
 
 // systemReport builds the server half of /api/v1/system.
-func systemReport(dataDir string, st *sqlite.Store, j *retention.Janitor, disk *diskguard.Guard, hub *livehub.Hub) func(context.Context) (httpapi.ServerStats, error) {
+func systemReport(dataDir string, st *sqlite.Store, j *retention.Janitor, disk *diskguard.Guard, hub *livehub.Hub,
+	up func() httpapi.UptimeStats) func(context.Context) (httpapi.ServerStats, error) {
 	return func(context.Context) (httpapi.ServerStats, error) {
 		var s httpapi.ServerStats
 		s.DBBytes = fileSize(filepath.Join(dataDir, dbFile))
@@ -65,6 +66,7 @@ func systemReport(dataDir string, st *sqlite.Store, j *retention.Janitor, disk *
 		}
 		s.WSSubscribers, s.WSDropped = hub.Subscribers(), hub.SlowDropped()
 		s.WriterWaits, s.WriterWaitMS = st.WriterWaits()
+		s.Uptime = up()
 		return s, nil
 	}
 }

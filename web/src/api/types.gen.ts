@@ -377,6 +377,150 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/monitors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description Every uptime monitor with its state, uptime over 24 h and 30 d and
+         *     the last 30 daily bars. Uptime is up / (up + down) over monitored
+         *     time: paused periods and gaps when the server was not checking
+         *     count as neither, so it is absent (null) when nothing was monitored.
+         */
+        get: operations["listMonitors"];
+        put?: never;
+        /**
+         * @description Admin only. Checked from the server. Private and loopback targets are
+         *     refused at connection time unless the operator allows them; cloud
+         *     metadata addresses always are. Refused with 429 at the plan's
+         *     max_monitors, and an interval below its min_check_interval is 400.
+         */
+        post: operations["createMonitor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        /** @description One monitor with uptime over 24 h, 7 d, 30 d and 90 d and 90 daily bars. */
+        get: operations["getMonitor"];
+        /** @description Admin only. A new kind or target starts the state over and ends any open incident. */
+        put: operations["updateMonitor"];
+        post?: never;
+        /** @description Admin only. Removes the monitor with its history. */
+        delete: operations["deleteMonitor"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}/pause": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only. Stops checking; an open incident ends now. Paused time does not count against uptime. */
+        post: operations["pauseMonitor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}/resume": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only. Starts checking again from state pending. */
+        post: operations["resumeMonitor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}/check": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Admin only. Runs a check at once; at most every 10 s per monitor (429), never while one runs (409). */
+        post: operations["checkMonitorNow"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}/results": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        /** @description Checks in [from, to), oldest first; at most 7 days, the newest 20 000 when there are more. */
+        get: operations["listMonitorResults"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/monitors/{mid}/incidents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        /** @description The newest incidents and notification events, newest first. */
+        get: operations["listMonitorIncidents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/system": {
         parameters: {
             query?: never;
@@ -710,6 +854,11 @@ export interface components {
             rule_id?: number | null;
             /** Format: uuid */
             host_id?: string | null;
+            /**
+             * Format: int64
+             * @description This monitor only; not with rule_id or host_id.
+             */
+            monitor_id?: number | null;
             /** Format: date-time */
             starts: string;
             /** Format: date-time */
@@ -723,6 +872,8 @@ export interface components {
             rule_id: number | null;
             /** Format: uuid */
             host_id: string | null;
+            /** Format: int64 */
+            monitor_id: number | null;
             /** Format: date-time */
             starts: string;
             /** Format: date-time */
@@ -779,6 +930,147 @@ export interface components {
             at: string;
             resolved: boolean;
         };
+        /** @enum {string} */
+        MonitorKind: "http" | "tcp" | "ping";
+        MonitorInput: {
+            name: string;
+            kind: components["schemas"]["MonitorKind"];
+            /** @description http: an http(s) URL; tcp: host:port; ping: a host name or IP address. */
+            target: string;
+            interval_s: number;
+            /** @description Default 10 (capped below the interval). */
+            timeout_s?: number;
+            /** @description Quick re-checks that must also fail before an incident opens. Default 1. */
+            confirm_retries?: number;
+            /**
+             * @description http only. Default GET.
+             * @enum {string}
+             */
+            method?: "GET" | "HEAD";
+            /** @description http only: accepted final status codes, e.g. "200-299,301". Default 200-399. */
+            accept_status?: string;
+            keyword?: string;
+            /** @enum {string} */
+            keyword_mode?: "" | "present" | "absent";
+            keyword_case_sensitive?: boolean;
+            /** @description https only: warn this many days before the certificate chain expires; 0 turns warnings off. Default 14 for https. */
+            cert_warn_days?: number;
+            channels?: number[];
+        };
+        Monitor: {
+            /** Format: int64 */
+            id: number;
+            name: string;
+            kind: components["schemas"]["MonitorKind"];
+            target: string;
+            interval_s: number;
+            timeout_s: number;
+            confirm_retries: number;
+            method: string;
+            accept_status: string;
+            keyword: string;
+            /** @enum {string} */
+            keyword_mode: "" | "present" | "absent";
+            keyword_case_sensitive: boolean;
+            cert_warn_days: number;
+            channels: number[];
+            paused: boolean;
+            /** Format: date-time */
+            created_at: string;
+            state: components["schemas"]["MonitorState"];
+            /** @description Uptime ratio (0-1) per window; a window is absent when nothing in it was monitored. */
+            uptime: {
+                "24h"?: number;
+                "7d"?: number;
+                "30d"?: number;
+                "90d"?: number;
+            };
+            /** @description Mean over the last 24 h of checks that measured one. */
+            avg_latency_ms: number | null;
+            bars: components["schemas"]["DayBar"][];
+        };
+        MonitorState: {
+            /** @enum {string} */
+            status: "pending" | "up" | "down" | "paused";
+            /**
+             * Format: date-time
+             * @description down: the first failed check of the incident.
+             */
+            since: string;
+            /** Format: date-time */
+            last_check: string | null;
+            /** @description Consecutive failed checks. */
+            failures: number;
+            /** @enum {string|null} */
+            cert_status: "ok" | "expiring" | null;
+            /** Format: date-time */
+            cert_expires_at: string | null;
+        };
+        DayBar: {
+            /** Format: date */
+            day: string;
+            up_s: number;
+            /** @description Both zero: the day was not monitored (a gap, not 100 %). */
+            down_s: number;
+            failures: number;
+        };
+        MonitorList: {
+            monitors: components["schemas"]["Monitor"][];
+            /** @description Whether this server can run ping monitors. */
+            ping_available: boolean;
+        };
+        CheckResult: {
+            /** Format: date-time */
+            at: string;
+            /**
+             * @description unknown: the server's own network was down.
+             * @enum {string}
+             */
+            outcome: "up" | "down" | "unknown";
+            error: components["schemas"]["CheckErrorClass"] | null;
+            latency_ms: number | null;
+            ttfb_ms: number | null;
+            status: number | null;
+            /** @description ping: percent of echoes lost. */
+            loss: number | null;
+            /** Format: date-time */
+            cert_expires_at: string | null;
+        };
+        CheckResultList: {
+            results: components["schemas"]["CheckResult"][];
+        };
+        Incident: {
+            /** Format: int64 */
+            id: number;
+            /** Format: date-time */
+            started: string;
+            /** Format: date-time */
+            ended: string | null;
+            error: components["schemas"]["CheckErrorClass"];
+            failures: number;
+            /** @description To the end, or to now while open. */
+            duration_s: number;
+        };
+        MonitorEvent: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            kind: "down" | "up" | "cert_expiring" | "cert_renewed";
+            /** Format: date-time */
+            at: string;
+            error: components["schemas"]["CheckErrorClass"] | null;
+            down_for_s: number | null;
+            /** Format: date-time */
+            cert_expires_at: string | null;
+            notified: boolean;
+            /** @enum {string} */
+            outcome: "" | "delivered" | "failed";
+            delivery: string;
+        };
+        IncidentList: {
+            incidents: components["schemas"]["Incident"][];
+            events: components["schemas"]["MonitorEvent"][];
+        };
         /** @description The body POSTed to a webhook channel for an uptime monitor event. */
         MonitorWebhook: {
             /** @enum {string} */
@@ -820,6 +1112,23 @@ export interface components {
                 agent_dropped_total: number;
             };
             server: {
+                /** @description Uptime checking across every tenant. */
+                uptime: {
+                    /** @description Monitors being scheduled (unpaused). */
+                    monitors: number;
+                    running: number;
+                    /** @description Checks run since start. */
+                    checks: number;
+                    /** @description Checks dropped because no worker was free for a whole interval; should stay 0. */
+                    skipped: number;
+                    /** @description Results discarded because the monitor changed while it was checked. */
+                    stale: number;
+                    /** @description Worst delay between a check being due and starting, since start. */
+                    max_lateness_ms: number;
+                    /** @description Without references, the server's own outage reports every monitor down. */
+                    references_configured: boolean;
+                    ping_available: boolean;
+                };
                 db_bytes: number;
                 db_wal_bytes: number;
                 disk_free_ratio: number | null;
@@ -836,6 +1145,10 @@ export interface components {
         };
         Usage: {
             plan: {
+                /** @description Uptime monitors allowed; beyond it new monitors are refused. */
+                max_monitors: number;
+                /** @description Shortest check interval a monitor may use. */
+                min_check_interval_s: number;
                 /** @description Enabled hosts allowed; beyond it new enrollments are refused. */
                 max_hosts: number;
                 /** Format: int64 */
@@ -844,6 +1157,12 @@ export interface components {
                 logs_retention_days: number;
             };
             usage: {
+                monitors: number;
+                /**
+                 * Format: int64
+                 * @description Uptime checks stored this month.
+                 */
+                month_checks: number;
                 hosts: number;
                 /** Format: int64 */
                 log_bytes_today: number;
@@ -869,6 +1188,7 @@ export interface components {
     };
     parameters: {
         HostID: string;
+        MonitorID: number;
     };
     requestBodies: never;
     headers: never;
@@ -1582,6 +1902,258 @@ export interface operations {
             };
             401: components["responses"]["Error"];
             403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listMonitors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's monitors. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitorList"];
+                };
+            };
+            401: components["responses"]["Error"];
+        };
+    };
+    createMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonitorInput"];
+            };
+        };
+        responses: {
+            /** @description Created; the first check runs at once. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Monitor"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    getMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The monitor. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Monitor"];
+                };
+            };
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    updateMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonitorInput"];
+            };
+        };
+        responses: {
+            /** @description Updated. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Monitor"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    deleteMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    pauseMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paused (or already paused). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    resumeMonitor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Resumed (or already running). */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    checkMonitorNow: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The check is queued; its result appears in the results. */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Error"];
+            403: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+            409: components["responses"]["Error"];
+            429: components["responses"]["Error"];
+        };
+    };
+    listMonitorResults: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The checks. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckResultList"];
+                };
+            };
+            400: components["responses"]["Error"];
+            401: components["responses"]["Error"];
+            404: components["responses"]["Error"];
+        };
+    };
+    listMonitorIncidents: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                mid: components["parameters"]["MonitorID"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Incidents and events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IncidentList"];
+                };
+            };
+            401: components["responses"]["Error"];
             404: components["responses"]["Error"];
         };
     };

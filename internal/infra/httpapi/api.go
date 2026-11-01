@@ -102,6 +102,9 @@ type Config struct {
 	Rules     Rules
 	Alerts    AlertAdmin
 	HostAdmin HostAdmin
+	Monitors  MonitorAdmin
+	// PingAvailable reports why ping monitors cannot run (nil: they can).
+	PingAvailable func() error
 	// Ready probes the database for /readyz; System reports server-wide
 	// figures for /api/v1/system. Either may be nil.
 	Plans  PlanReader
@@ -142,6 +145,7 @@ func New(cfg Config) *API {
 	a.mux.HandleFunc("POST /api/v1/redaction-rules", a.requireOrigin(a.requireSession(admin, a.handleCreateRule)))
 	a.mux.HandleFunc("DELETE /api/v1/redaction-rules/{rid}", a.requireOrigin(a.requireSession(admin, a.handleDeleteRule)))
 	a.alertRoutes(viewer, admin)
+	a.monitorRoutes(viewer, admin)
 	a.mux.HandleFunc("GET /healthz", a.handleHealthz)
 	a.mux.HandleFunc("GET /readyz", a.handleReadyz)
 	a.mux.HandleFunc("GET /api/v1/system", a.requireSession(admin, a.handleSystem))

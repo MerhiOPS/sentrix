@@ -8,6 +8,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/alerting"
 	"github.com/MerhiOPS/sentrix/internal/app/uptime"
 	"github.com/MerhiOPS/sentrix/internal/domain"
+	"github.com/MerhiOPS/sentrix/internal/infra/httpapi"
 	"github.com/MerhiOPS/sentrix/internal/infra/netguard"
 	"github.com/MerhiOPS/sentrix/internal/infra/notify"
 	"github.com/MerhiOPS/sentrix/internal/infra/probe"
@@ -24,7 +25,7 @@ type uptimeOptions struct {
 // startUptime runs the uptime scheduler and its own notification
 // dispatcher until ctx ends; a slow alert webhook cannot delay a down
 // notification, nor the reverse.
-func startUptime(ctx context.Context, st *sqlite.Store, o uptimeOptions) *uptime.Scheduler {
+func startUptime(ctx context.Context, st *sqlite.Store, o uptimeOptions) (*uptime.Scheduler, *uptime.References) {
 	log := slog.Default().With("component", "uptime")
 	policy := netguard.Policy{AllowPrivate: o.allowPrivate}
 	if o.allowPrivate {
@@ -52,5 +53,12 @@ func startUptime(ctx context.Context, st *sqlite.Store, o uptimeOptions) *uptime
 	}
 	go out.Run(ctx)
 	go sched.Run(ctx)
-	return sched
+	return sched, refs
+}
+
+// uptimeStats is the uptime part of /api/v1/system.
+func uptimeStats(sched *uptime.Scheduler, refs *uptime.References) httpapi.UptimeStats {
+	s := sched.Stats()
+	return httpapi.UptimeStats{Monitors: s.Monitors, Running: s.Running, Checks: s.Checks, Skipped: s.Skipped, Stale: s.Stale,
+		MaxLatenessMS: s.MaxLateness.Milliseconds(), ReferencesConfigured: refs.Configured(), PingAvailable: probe.PingAvailable() == nil}
 }

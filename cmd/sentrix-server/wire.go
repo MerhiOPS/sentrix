@@ -12,11 +12,13 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/app/ingest"
 	"github.com/MerhiOPS/sentrix/internal/app/query"
 	"github.com/MerhiOPS/sentrix/internal/app/redaction"
+	"github.com/MerhiOPS/sentrix/internal/app/uptime"
 	"github.com/MerhiOPS/sentrix/internal/infra/diskguard"
 	"github.com/MerhiOPS/sentrix/internal/infra/httpapi"
 	"github.com/MerhiOPS/sentrix/internal/infra/ingesthttp"
 	"github.com/MerhiOPS/sentrix/internal/infra/livehub"
 	"github.com/MerhiOPS/sentrix/internal/infra/password"
+	"github.com/MerhiOPS/sentrix/internal/infra/probe"
 	"github.com/MerhiOPS/sentrix/internal/infra/redact"
 	"github.com/MerhiOPS/sentrix/internal/infra/sqlite"
 	"github.com/MerhiOPS/sentrix/internal/wire"
@@ -68,12 +70,16 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		return handlers{}, err
 	}
 	janitor := startJanitor(ctx, st)
+	sched, refs := startUptime(ctx, st, up)
+	monitors := uptime.NewAdmin(uptime.AdminDeps{Monitors: st, States: st, History: st, Plans: st, Sched: sched,
+		PingAvailable: probe.PingAvailable, Now: time.Now})
 	api := httpapi.New(httpapi.Config{
+		Monitors: monitors, PingAvailable: probe.PingAvailable,
 		Sessions: sessions, Users: st, Tokens: enroll, Hosts: st,
 		Series: query.NewMetrics(st, st, st), Details: query.NewDetails(st, st), Procs: st, Live: hub,
 		Logs: query.NewLogs(st), Rules: redaction.NewRules(st, redactor),
 		Alerts: alerting.NewAdmin(st, st, st, st), HostAdmin: identity.NewHosts(st, auth, time.Now),
-		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub),
+		Ready: st.Ready, System: systemReport(dataDir, st, janitor, disk, hub, func() httpapi.UptimeStats { return uptimeStats(sched, refs) }),
 		Plans:        identity.NewPlans(st, time.Now),
 		Export:       export.New(st, st, st, st),
 		FormatToken:  func(secret []byte) string { return wire.Token{Secret: secret, Pin: pin}.String() },
@@ -82,6 +88,5 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 		Now:          time.Now,
 	})
 	startAlerting(ctx, st)
-	startUptime(ctx, st, up)
 	return handlers{ingest: ingestH, dashboard: api}, nil
 }
