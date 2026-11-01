@@ -128,11 +128,9 @@ func (s *Service) Ingest(ctx context.Context, ah AuthHost, b Batch) (Result, err
 	}
 	res := Result{Replayed: cr.Replayed, Stored: cr.Stored, Conflicts: cr.Conflicts,
 		SeriesRefused: cr.SeriesRefused, ServerNow: now}
-	if !cr.Replayed {
-		res.LogsShed, res.LogsShedReason = final.Shed, final.ShedReason
-	}
-	if !cr.Replayed {
+	if !cr.Replayed { // a replay was counted when it was first stored
 		res.Rejected = rejected
+		res.LogsShed, res.LogsShedReason = final.Shed, final.ShedReason
 	}
 	return res, nil
 }
