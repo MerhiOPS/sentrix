@@ -29,3 +29,7 @@ web/dist/*
 # misc
 *.log
 coverage.out
+
+# browser test output
+web/test-results/
+web/playwright-report/

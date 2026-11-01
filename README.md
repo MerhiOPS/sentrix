@@ -128,6 +128,8 @@ LOG, not hidden.
 go test ./...            # Go tests (the contract suite runs on both stores)
 go run ./scripts/ci all  # repo checks: line limit, layering, SQL placement
 cd web && npm ci && npm test && npm run build
+# browser tests: build the server with the dashboard embedded first
+go build -o sentrix-server ./cmd/sentrix-server && (cd web && npx playwright install chromium && npm run e2e)
 ```
 
 Plan and per-phase build log: [`docs/PLAN.md`](docs/PLAN.md),
