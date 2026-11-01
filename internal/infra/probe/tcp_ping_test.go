@@ -33,7 +33,8 @@ func TestTCP(t *testing.T) {
 	defer func() { _ = ln.Close() }()
 	m := domain.Monitor{Kind: domain.MonitorTCP, Timeout: time.Second}
 	m.Target = open
-	if r := loopback().Probe(context.Background(), m); r.Outcome != domain.CheckUp || r.Latency <= 0 {
+	// A loopback connect can measure 0 at the clock's resolution (Windows).
+	if r := loopback().Probe(context.Background(), m); r.Outcome != domain.CheckUp || r.Latency < 0 {
 		t.Fatalf("open port: %+v", r)
 	}
 	m.Target = closed

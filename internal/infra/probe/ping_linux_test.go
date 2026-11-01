@@ -19,7 +19,7 @@ func TestPingLoopback(t *testing.T) {
 	}
 	m := domain.Monitor{Kind: domain.MonitorPing, Target: "127.0.0.1", Timeout: 3 * time.Second}
 	r := loopback().Probe(context.Background(), m)
-	if r.Outcome != domain.CheckUp || r.Loss != 0 || r.Latency <= 0 {
+	if r.Outcome != domain.CheckUp || r.Loss != 0 || r.Latency < 0 {
 		t.Fatalf("ping 127.0.0.1: %+v", r)
 	}
 	m.Target = "localhost"

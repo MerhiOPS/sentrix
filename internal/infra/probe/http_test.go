@@ -48,7 +48,9 @@ func TestHTTPStatusAndTiming(t *testing.T) {
 	p := loopback()
 	r := p.Probe(context.Background(), httpMon(srv.URL))
 	expect(t, r, domain.CheckUp, domain.ErrNone)
-	if r.StatusCode != 200 || r.Latency <= 0 || r.TTFB <= 0 || r.TTFB > r.Latency || r.At.IsZero() || r.CertExpiry != nil {
+	// Timings on loopback can be 0 at the clock's resolution; they must be
+	// consistent, not positive.
+	if r.StatusCode != 200 || r.Latency < 0 || r.TTFB < 0 || r.TTFB > r.Latency || r.At.IsZero() || r.CertExpiry != nil {
 		t.Fatalf("result %+v", r)
 	}
 	r = p.Probe(context.Background(), httpMon(srv.URL+"/down"))
