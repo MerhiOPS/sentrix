@@ -1,6 +1,6 @@
 # Sentrix — Build Plan
 
-**Status:** draft v2 — reviewed · 2026-10-24 · Owner: Ahmad Merhi
+**Status:** v2 reviewed · 2026-10-24; Phase 9 (uptime) proposed 2026-11-01 · Owner: Ahmad Merhi
 
 Sentrix is a clean rebuild of an earlier in-house prototype (called OLD
 below) as a **showcase**: one
@@ -553,6 +553,168 @@ failing before the code that makes it pass (R2).
 - **Accept:** on a clean VM, `docker run` of the image → login → live charts in
   under 60 s, timed and written down; from-source build time also recorded.
 
+### Phase 9 — Uptime monitoring (L)
+
+External checks in the style of UptimeRobot: the server probes websites and
+services and alerts when they go down. Everything above is push from agents;
+this is the one place the server reaches out, so the SSRF guard (Phase 5) is
+the boundary, not an afterthought.
+
+**Checks.** A *monitor* is one target, one kind, one interval:
+- `http` — GET (or HEAD) of an `http`/`https` URL. Up when the final status is
+  in the monitor's accepted set (default `200-399`) within the timeout.
+  Optional keyword: the first 1 MiB of the body must (or must not) contain a
+  string, case-sensitive or not; a body past the cap is matched on the cap and
+  says so. Redirects followed up to 5 hops; every hop is dialled through the
+  guard, so a redirect to `127.0.0.1` is refused like a direct URL. Fresh
+  connection per check (`DisableKeepAlives`): a reused socket would hide DNS,
+  connect and TLS failures. Recorded: status, total time, time to first
+  byte, error class.
+- **certificate** (part of `https` monitors, not a separate kind): an invalid
+  certificate (expired, untrusted, wrong name) is a failed check. Expiry is the
+  earliest `NotAfter` across the **verified chain**, not just the leaf — an
+  expiring intermediate breaks the site just the same. `cert_warn_days`
+  (default 14, 0 = off) raises a *certificate* warning that is independent of
+  up/down: a site can be up with a cert about to expire.
+- `tcp` — connect to `host:port` within the timeout, through the guard.
+- `ping` — 3 ICMP echoes over an unprivileged ping socket (`SOCK_DGRAM`,
+  `IPPROTO_ICMP`; `golang.org/x/net/icmp`); down when all 3 are lost. Records
+  loss and average RTT. The name is resolved once, the resolved address is
+  checked by the guard and is the one pinged. Needs
+  `net.ipv4.ping_group_range` to include the server's group (systemd's
+  default; checked in `/readyz` details and by the `.deb` smoke test); no
+  capability is granted. Where ping sockets are unavailable (Windows server,
+  restricted sysctl) creating a `ping` monitor is refused with that reason,
+  never silently reported as down.
+- Error classes, the only failure detail stored or shown: `dns`, `connect`,
+  `timeout`, `tls`, `status`, `keyword`, `blocked`, `ping_loss`. Never the
+  response body, never a raw dialer error with internal addresses in it.
+
+**SSRF.** The Phase 5 guard moves to `infra/netguard`, shared by `notify` and
+the probers. Same deny list, same `Control`-hook check on the address actually
+dialled (DNS rebinding cannot pass), `Proxy: nil`. A refused address fails
+the check as `blocked` *before* any packet is sent, so a tenant learns
+nothing about the internal network from timings or error text. Operator flag
+`--uptime-allow-private` (server-wide, off by default) admits RFC 1918, ULA,
+CGNAT and loopback for single-company installs; link-local (cloud metadata,
+`169.254.169.254`) stays refused even then.
+
+**Scheduling** (`app/uptime`, driven by `Tick` on an injectable clock):
+- Interval 30 s – 24 h; floor set by the plan (`min_check_interval`, default
+  60 s). Timeout 1–30 s, below the interval.
+- Each monitor gets a stable phase offset (hash of its id) so monitors with the
+  same interval spread across it instead of firing on the same second.
+- Next due time derives from the last stored result, so a restart resumes the
+  schedule rather than checking everything at once.
+- Bounded worker pool (global `--uptime-workers`, default 64) with a per-tenant
+  share, so one tenant with 1 000 slow monitors cannot starve the others. A
+  monitor is never checked twice concurrently. Lateness (due → started) and
+  checks skipped for saturation are counted and shown in `/api/v1/system`.
+- **Confirmation before "down"**: a failed check is retried after
+  `min(10 s, interval/3)` up to `confirm_retries` (default 1) times; only a
+  confirmed failure opens an incident. A single blip does not page anyone.
+- **The server's own network.** If the server loses connectivity, every
+  monitor fails at once and every tenant is paged for nothing. Optional
+  `--uptime-reference` targets (operator-chosen, none by default — calling a
+  third party unasked is outbound traffic the operator did not opt into):
+  when a check fails with `dns`/`connect`/`timeout`, the scheduler checks the
+  references (cached for one minute); if they fail too, the result is stored
+  as `unknown` and no state changes. Without references the flag's absence is
+  reported in `/api/v1/system` and the runbook.
+
+**State and incidents.**
+- Monitor state: `pending` (no result yet) → `up` ⇄ `down`; `paused` by the
+  user. Certificate state: `ok` ⇄ `expiring`, alongside.
+- An *incident* is one down period: start, end (null while open), the first
+  error class and the count of failed checks. The incident row and the state
+  change are one transaction, with the event written first (R1, as in
+  Phase 5). An open incident survives a restart; the recovery after the
+  restart closes it and notifies once.
+- **Uptime %** = 1 − downtime / monitored time over the window (24 h, 7 d,
+  30 d, 90 d). Downtime comes from incidents (exact durations, not check
+  counts, so the number does not depend on the interval). Monitored time
+  excludes paused periods and `unknown` gaps: an interval with no result
+  because the server was down counts as neither up nor down, and the UI shows
+  the gap. Stated in the UI next to the number.
+
+**Notifications.** Reuse channels and the Phase 5 dispatcher (retry, recorded
+outcome, failed-if-any-channel-failed, sweep at startup). A monitor lists its
+channels directly — UptimeRobot's model, simpler than a rule. Notified: down
+(after confirmation), up (with how long it was down), certificate expiring,
+certificate renewed. Silences gain an optional monitor; a silence with no
+rule, host or monitor still covers everything. Webhook payload gains
+`"source": "monitor"` and the monitor's name and URL; the existing fields are
+unchanged, so current receivers keep working. The dispatcher's delivery record
+becomes a per-job recorder, so alert events and monitor events each record
+into their own table.
+
+**Storage** (migration `0007_uptime.sql`, every table tenant-keyed with
+composite foreign keys, per §4.1):
+- `monitors` (definition + current state), `monitor_channels`,
+  `monitor_results` (one row per check: time, outcome, latency, ttfb,
+  status, error class; ~30 B), `monitor_daily` (per UTC day: checks, failures,
+  latency sum/min/max, down ms, unknown ms — the 90-day bars and long
+  history), `monitor_incidents`, `monitor_events`.
+- Daily rollup maintained in the same transaction as the result (R1), like the
+  metric rollups.
+- Retention: new kinds `monitor_results` (default 30 d) and `monitor_daily`
+  (default 400 d), both capped by `metrics_retention_days`. Incidents are
+  kept as long as the daily rollups.
+- At 1 000 monitors every 60 s that is 1.44 M results/day, ~45 MB/day before
+  pruning — measured in the phase and published in the README.
+- Ports in `app/uptime`, implemented by `sqlite` and `memstore`, covered by the
+  contract suite including cross-tenant cases (the reflected check already
+  demands them).
+
+**Plans.** `max_monitors` (default 50) and `min_check_interval` (default 60 s).
+Over `max_monitors` → creating a monitor is refused; existing ones keep
+running. Checks per month metered when the result is written. Usage shown in
+Settings.
+
+**Compliance.** Tenant erasure covers monitors (URLs can carry customer data),
+with the canary post-check extended to a monitor URL. Export gains
+`monitor_results` and `monitor_incidents`. Backups include them for free.
+
+**API and UI.**
+- `GET/POST /api/v1/monitors`, `PUT/DELETE /api/v1/monitors/{id}`,
+  `POST …/{id}/pause|resume`, `POST …/{id}/check` (run now, rate-limited per
+  monitor), `GET …/{id}/results?from&to`, `…/{id}/incidents`,
+  `…/{id}/uptime`. Admin writes, viewer reads. OpenAPI first, TS generated.
+- State changes go out on the existing WebSocket (tenant-filtered in the hub).
+- Dashboard: an **Uptime** page — status, uptime 24 h/30 d, current response
+  time, 90-day daily bars, cert days left, last check; a monitor page with the
+  response-time chart, incidents, recent checks; a create/edit form with a
+  "test now" button. Viewer sees no edit controls.
+- Demo: two loopback HTTP targets (one steady, one that flaps every few
+  minutes) plus a TCP target, so the demo shows an incident cycle without
+  touching the internet. Loopback is admitted only in demo mode.
+
+**Non-goals (Phase 9)**: public status pages; checks from agents or multiple
+locations; custom request headers, auth and POST bodies (they hold secrets
+and need the channel-URL masking treatment); DNS and heartbeat (cron)
+monitors; per-region latency. Each is v2 and listed here so it is not
+forgotten.
+
+- **Accept:** a monitor due every 60 s is checked on a fake clock at its phase
+  offset and not twice concurrently (test); a restart does not check every
+  monitor at once (test); one failed check does not open an incident, a
+  confirmed one does, recovery closes it and notifies once (test); an
+  incident open at restart is closed and notified once after it (test);
+  references down → result `unknown`, no transition (test); a URL to
+  `127.0.0.1`, a name resolving to it, and a public URL redirecting to it are
+  all `blocked` with no connection made (test); `--uptime-allow-private`
+  still refuses `169.254.169.254` (test); keyword present/absent/beyond the
+  cap (test); expired, wrong-name and untrusted certs fail as `tls`, a chain
+  whose intermediate expires first warns on the intermediate's date (test);
+  ping to loopback succeeds over an unprivileged socket in Linux CI and fails
+  the test if the socket cannot be opened (test); uptime % with an incident,
+  a pause and an `unknown` gap matches a hand-computed value (test); tenant A
+  cannot read, check, pause or attach a channel to tenant B's monitor (test);
+  over `max_monitors` creation is refused and existing monitors keep running
+  (test); erasure post-check fails when a monitor URL is left behind (test);
+  results and daily rows pruned at retention (test); ingest ceiling re-run
+  with 1 000 monitors checking, both numbers published.
+
 ---
 
 ## 6. Risks
@@ -566,6 +728,9 @@ failing before the code that makes it pass (R2).
 | modernc.org/sqlite behaviour differs from C SQLite docs | Phase 0 assumption tests on the pinned version; re-run on every bump |
 | Windows code paths | Windows CI runner runs the tests; Event Log still best-effort (OLD C-M13 burst loss unproven) |
 | Scope creep from "SaaS" ideas | billing, email, grouping, MSI, rotation explicitly v2 |
+| Uptime checks as an SSRF and scanning tool | shared dial-time guard, `blocked` before any packet, error classes only, private targets an operator flag, link-local never |
+| False "down" pages when the server's own network fails | confirmation retries; optional reference targets turn a server-side outage into `unknown`, not an incident |
+| Probe load competing with ingest for the single writer | one small row per check, bounded worker pool, ingest ceiling re-measured with monitors running |
 
 ## 7. Open questions
 1. Demo hosting: publish a live demo instance or screenshots only?
