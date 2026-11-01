@@ -11,7 +11,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
-// testMaxHostsRefusesOnlyNewEnrollments: Phase 7 acceptance. Over the
+// testMaxHostsRefusesOnlyNewEnrollments: over the
 // limit a new enrollment is refused (and its token stays usable), while the
 // existing host keeps reporting. Disabling a host frees a slot.
 func testMaxHostsRefusesOnlyNewEnrollments(t *testing.T, st Stores) {

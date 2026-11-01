@@ -1,5 +1,5 @@
 // Package identity holds the identity bounded context: tenants, enrollment
-// tokens and host credentials (users and sessions arrive in Phase 2).
+// tokens, host credentials, users and sessions.
 package identity
 
 import (
@@ -14,9 +14,9 @@ import (
 type TenantRepo interface {
 	CreateTenant(ctx context.Context, ops domain.OpsScope, t domain.Tenant) error
 	GetTenant(ctx context.Context, s domain.Scope) (domain.Tenant, error)
-	// SetSeriesLimit sets the tenant's detail-series ceiling (plans, Phase 7).
+	// SetSeriesLimit sets the tenant's detail-series ceiling (from its plan).
 	SetSeriesLimit(ctx context.Context, ops domain.OpsScope, t domain.TenantID, limit int) error
-	// SetLogLimit sets the tenant's daily log quota in bytes (plans, Phase 7).
+	// SetLogLimit sets the tenant's daily log quota in bytes (from its plan).
 	SetLogLimit(ctx context.Context, ops domain.OpsScope, t domain.TenantID, bytes int64) error
 }
 

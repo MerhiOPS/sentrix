@@ -67,7 +67,7 @@ func (s *Store) GetUsage(ctx context.Context, sc domain.Scope, now time.Time) (d
 
 // meterBatch records what a batch stored, inside its transaction and after
 // the replay gate: a resent batch never reaches here, so it is never
-// counted twice (PLAN Phase 7).
+// counted twice.
 func meterBatch(ctx context.Context, tx *batchTx, tk, hk, day int64, samples int, logBytes int64) error {
 	res, err := tx.ExecContext(ctx, `INSERT INTO usage_host_days (tenant_key, day, host_key) VALUES (?, ?, ?)
 		ON CONFLICT DO NOTHING`, tk, day, hk)

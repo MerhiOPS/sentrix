@@ -41,7 +41,7 @@ func (r *rig) searchLogs(t *testing.T, cookie, q string) (int, logPageDTO) {
 	return res.status, page
 }
 
-// TestSecretsRedactedOnTheStoredRow: Phase 4 acceptance — asserted on what
+// TestSecretsRedactedOnTheStoredRow is asserted on what
 // search returns from storage, not on the redactor's output.
 func TestSecretsRedactedOnTheStoredRow(t *testing.T) {
 	r := newRig(t)
@@ -100,7 +100,7 @@ func TestMalformedCursorIs400(t *testing.T) {
 	path := "/api/v1/logs?from=" + url.QueryEscape(now.Add(-time.Hour).Format(time.RFC3339)) +
 		"&to=" + url.QueryEscape(now.Format(time.RFC3339)) + "&cursor=%21%21"
 	if res := r.call(t, "GET", path, r.login(t, r.a.viewer), ""); res.status != http.StatusBadRequest {
-		t.Fatalf("malformed cursor: %d, want 400 (OLD B9)", res.status)
+		t.Fatalf("malformed cursor: %d, want 400", res.status)
 	}
 }
 

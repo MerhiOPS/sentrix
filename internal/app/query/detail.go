@@ -111,7 +111,7 @@ func bucketDetail(req DetailRequest, step time.Duration, kind domain.MetricKind,
 		case x == nil:
 		case kind == domain.KindCounter:
 			if span := x.lastTS.Sub(x.firstTS).Seconds(); span > 0 {
-				f.Values[i] = (x.last - x.first) / span // covered span (OLD B5)
+				f.Values[i] = (x.last - x.first) / span // covered span, not bucket width
 			}
 		default:
 			f.Values[i] = x.sum / x.count

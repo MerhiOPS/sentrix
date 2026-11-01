@@ -22,7 +22,7 @@ type Exporter interface {
 
 // handleExport: GET /api/v1/export?table&from&to&format=csv|ndjson[&host].
 // Everything is validated before the first byte, so a bad request is a
-// clean JSON error, never a half-written file (OLD B12). A failure after
+// clean JSON error, never a half-written file. A failure after
 // that cannot change the status: NDJSON ends with an error record.
 func (a *API) handleExport(w http.ResponseWriter, r *http.Request) {
 	scope, err := scopeFrom(r.Context())

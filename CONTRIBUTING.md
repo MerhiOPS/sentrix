@@ -71,6 +71,10 @@ SQLite has no row-level security; the repository layer is the boundary.
 
 - `gofmt`, `go vet` and `golangci-lint` clean before every commit.
 - Wrap errors with context: `fmt.Errorf("open store: %w", err)`.
+- Comments say *why*, in words a new reader can follow. Cite a design
+  section (`PLAN §4.1`) when it helps; never a phase, an issue code or a
+  project that is not in this repository. History belongs in git and
+  `docs/LOG.md`.
 - `context.Context` is the first parameter on anything doing I/O.
 - No `panic` outside `main()` and `init()`.
 - Table-driven tests.

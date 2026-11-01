@@ -17,9 +17,9 @@ type Batch struct {
 	BatchSeq   uint64     `json:"batch_seq"`
 	IntervalMS int64      `json:"interval_ms"`
 	Samples    []Sample   `json:"samples"`
-	Details    []Detail   `json:"details,omitempty"`   // Phase 3; absent from older agents
-	Processes  []Snapshot `json:"processes,omitempty"` // Phase 3
-	Logs       []LogLine  `json:"logs,omitempty"`      // Phase 4
+	Details    []Detail   `json:"details,omitempty"`   // absent from older agents
+	Processes  []Snapshot `json:"processes,omitempty"` // absent from older agents
+	Logs       []LogLine  `json:"logs,omitempty"`      // absent from older agents
 	Agent      AgentStats `json:"agent"`
 }
 
@@ -92,7 +92,7 @@ type Ack struct {
 	// accepted window, invalid values). They are counted, never retried.
 	Rejected int `json:"rejected"`
 	// LogsShed counts log lines refused (quota, disk) while metrics were
-	// stored. The agent counts them and does not resend them (Phase 4).
+	// stored. The agent counts them and does not resend them.
 	LogsShed       int    `json:"logs_shed"`
 	LogsShedReason string `json:"logs_shed_reason,omitempty"`
 }

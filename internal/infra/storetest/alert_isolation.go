@@ -31,7 +31,7 @@ func notFound(call string, err error) string {
 	return ""
 }
 
-// alertCrossCases extend crossCases for the Phase 5 ports. B acting on A's
+// alertCrossCases extend crossCases for the alerting ports. B acting on A's
 // ids must find nothing and change nothing.
 var alertCrossCases = map[string]crossCase{
 	"RuleRepo.ListRules": func(ctx context.Context, st Stores, a, b fixture) string {

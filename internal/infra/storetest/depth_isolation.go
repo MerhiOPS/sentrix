@@ -27,7 +27,7 @@ func seedSeries(ctx context.Context, st Stores, f fixture, seq uint64) (int64, e
 	return ss[0].ID, nil
 }
 
-// depthCrossCases extend crossCases for the Phase 3 read ports.
+// depthCrossCases extend crossCases for the detail-series read ports.
 var depthCrossCases = map[string]crossCase{
 	"RollupReader.Rollups": func(ctx context.Context, st Stores, a, b fixture) string {
 		got, err := st.Rollups(ctx, b.scope, a.host, query.Res1m, T0.Add(-time.Hour), T0.Add(time.Hour))

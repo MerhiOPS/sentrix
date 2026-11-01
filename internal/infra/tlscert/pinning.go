@@ -9,7 +9,7 @@ import (
 )
 
 // ErrPinMismatch means the server presented a key other than the pinned one.
-// The agent treats it as fatal, never as a warning (PLAN Phase 6).
+// The agent treats it as fatal, never as a warning.
 var ErrPinMismatch = errors.New("server key does not match the pinned key")
 
 // PinnedClientConfig returns a client TLS config that accepts exactly the

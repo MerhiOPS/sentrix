@@ -135,7 +135,7 @@ func testLastSeenUpdated(t *testing.T, st Stores) {
 }
 
 // testHealthPersisted: what the agent reported and what the server refused
-// are stored with the batch (Phase 1: "rejected and counted").
+// are stored with the batch: a rejected sample is counted, never silent.
 func testHealthPersisted(t *testing.T, st Stores) {
 	f := newFixture(t, st, "a")
 	report := func(rejected int, conflictsOf []int) ingest.BuildFunc {

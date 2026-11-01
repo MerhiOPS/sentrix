@@ -1,7 +1,7 @@
 package sqlite
 
-// Log search benchmark (PLAN Phase 4: "search latency over 1M lines
-// measured and published"). One million realistic lines are stored through
+// Log search benchmark: search latency over 1M lines, as published in the
+// README. One million realistic lines are stored through
 // the real CommitBatch path, then each query shape is timed.
 //
 //	go test ./internal/infra/sqlite -run '^$' -bench LogSearch -benchtime 20x -timeout 30m

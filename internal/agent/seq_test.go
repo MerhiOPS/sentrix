@@ -27,7 +27,7 @@ func TestSeqIsFlooredByClock(t *testing.T) {
 	}
 }
 
-// TestFreshStateDirDoesNotRepeatSeq is the Phase 1 acceptance case: a lost
+// TestFreshStateDirDoesNotRepeatSeq covers the lost state dir case: a lost
 // state dir must not restart the sequence below what the server has seen,
 // or every new batch would be acked as a replay and discarded.
 func TestFreshStateDirDoesNotRepeatSeq(t *testing.T) {
@@ -89,7 +89,7 @@ func TestIdentityRoundTripAndPermissions(t *testing.T) {
 	if err != nil || got != id {
 		t.Fatalf("round trip: %+v, %v", got, err)
 	}
-	// Windows has no POSIX modes; its protection (DPAPI + ACL) is Phase 6.
+	// Windows has no POSIX modes; its protection (DPAPI + ACL) is tested in secret_windows_test.go.
 	if fi, _ := os.Stat(filepath.Join(dir, identityFile)); runtime.GOOS != "windows" && fi.Mode().Perm() != 0o600 {
 		t.Fatalf("identity file mode %v, want 0600", fi.Mode().Perm())
 	}

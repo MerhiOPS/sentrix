@@ -60,7 +60,7 @@ func New(h query.HostReader, c query.CoreReader, l query.LogReader, e EventListe
 }
 
 // Prepare validates a request completely — table, range and host — so the
-// caller can refuse it before writing any response header (OLD B12).
+// caller can refuse it before writing any response header.
 func (e *Exporter) Prepare(ctx context.Context, s domain.Scope, req Request) ([]domain.Host, error) {
 	switch req.Table {
 	case TableMetrics, TableLogs, TableEvents:

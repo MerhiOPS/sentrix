@@ -1,5 +1,5 @@
 #!/bin/sh
-# Phase 8 acceptance on a clean machine (run by CI): build the image, start
+# Clean-machine acceptance (run by CI): build the image, start
 # the demo, log in, and time how long until every simulated host has live
 # data. Prints the seconds from `docker run` to live charts.
 set -eu

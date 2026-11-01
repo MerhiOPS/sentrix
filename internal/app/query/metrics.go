@@ -10,7 +10,7 @@ import (
 
 // MaxPoints is the most points one series request may return. A request
 // over it is refused, never silently downsampled into something the caller
-// did not ask for (OLD B1/B8) — the caller passes a coarser step.
+// did not ask for — the caller passes a coarser step.
 const MaxPoints = 2000
 
 // Gauge names a chartable core metric: a gauge, or a counter's rate.
@@ -47,7 +47,7 @@ type SeriesRequest struct {
 
 // Frame is columnar: one timestamp axis, one value column per metric. NaN
 // is a bucket without data; the transport renders it as null, so a chart
-// draws a gap instead of a fake zero (OLD B13).
+// draws a gap instead of a fake zero.
 type Frame struct {
 	From, To time.Time
 	Step     time.Duration

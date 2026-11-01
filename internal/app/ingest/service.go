@@ -19,7 +19,7 @@ type Batch struct {
 	Agent     AgentStats
 }
 
-// Per-batch caps (OLD A-M5). The transport enforces the same numbers; the
+// Per-batch caps. The transport enforces the same numbers; the
 // use case does not trust that it did.
 const (
 	MaxSamples   = 1000

@@ -17,7 +17,7 @@ const (
 )
 
 // Admin is the rule, channel and silence management use case. Channel URLs
-// leave it masked, for every role (OLD B2): nothing after the evaluator
+// leave it masked, for every role: nothing after the evaluator
 // needs the real one.
 type Admin struct {
 	rules    RuleRepo

@@ -1,6 +1,6 @@
 // Package diskguard implements the log disk watermark: below a free-space
-// ratio on the data directory, logs are shed and metrics keep flowing
-// (PLAN Phase 4). Logs are the unbounded input; metrics are not.
+// ratio on the data directory, logs are shed and metrics keep flowing.
+// Logs are the unbounded input; metrics are not.
 package diskguard
 
 import (

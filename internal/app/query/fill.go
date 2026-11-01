@@ -59,7 +59,7 @@ func (a *acc) observe(firstTS time.Time, first map[string]float64, lastTS time.T
 
 // emit writes the bucket into column i. Gauges are means. A rate divides
 // the counter's growth by the span its samples cover — never the bucket
-// width (OLD B5): a bucket with an interior gap is not diluted. Stored
+// width: a bucket with an interior gap is not diluted. Stored
 // counters are reset-adjusted, so growth is never negative; one sample
 // (zero span) is no rate at all.
 func (a *acc) emit(f *Frame, i int, gauges []Gauge) {

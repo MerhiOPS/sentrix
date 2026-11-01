@@ -4,7 +4,7 @@ import { TimeBuffer, type Point } from "./ringbuffer";
 const p = (s: number, cpu: number): Point => ({ tsMs: s * 1000, values: { cpu } });
 
 describe("TimeBuffer", () => {
-  it("dedupes reconnect backfill by timestamp (OLD B7)", () => {
+  it("dedupes reconnect backfill by timestamp", () => {
     const b = new TimeBuffer(100);
     b.upsert([p(1, 10), p(2, 20), p(3, 30)]);
     b.upsert([p(2, 21), p(3, 31), p(4, 40)]); // backfill overlaps

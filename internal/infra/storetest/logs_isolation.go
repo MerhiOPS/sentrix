@@ -10,7 +10,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
-// logCrossCases extend crossCases for the Phase 4 ports.
+// logCrossCases extend crossCases for the log ports.
 var logCrossCases = map[string]crossCase{
 	"LogReader.SearchLogs": func(ctx context.Context, st Stores, a, b fixture) string {
 		if _, err := st.CommitBatch(ctx, a.scope, a.host, 601, withLogs(nil, line(0, domain.LevelError, "tenant-a-secret-line"))); err != nil {

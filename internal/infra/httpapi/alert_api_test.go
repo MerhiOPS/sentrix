@@ -23,7 +23,7 @@ func ruleBody(hosts ...domain.HostID) string {
 		`"duration_s":300,"hosts":[` + strings.Join(ids, ",") + `],"on_no_data":"hold","cooldown_s":600,"channels":[],"enabled":true}`
 }
 
-// TestChannelSecretsMaskedForEveryRole: Phase 5 acceptance.
+// TestChannelSecretsMaskedForEveryRole: no role ever reads a channel URL.
 func TestChannelSecretsMaskedForEveryRole(t *testing.T) {
 	r := newRig(t)
 	admin := r.login(t, r.a.admin)
@@ -59,7 +59,7 @@ func TestChannelSecretsMaskedForEveryRole(t *testing.T) {
 	}
 }
 
-// TestRuleOnAnotherTenantsHostRefused: Phase 5 acceptance.
+// TestRuleOnAnotherTenantsHostRefused: a rule cannot name a foreign host.
 func TestRuleOnAnotherTenantsHostRefused(t *testing.T) {
 	r := newRig(t)
 	admin := r.login(t, r.a.admin)

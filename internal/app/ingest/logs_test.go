@@ -118,7 +118,7 @@ func TestAllDroppedBatchIsStillMetered(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(st.prepared) != 1 || st.prepared[0].LogStats.Dropped != 1 {
-		t.Fatal("a batch whose every line was dropped was not committed with its counts (OLD C-M11)")
+		t.Fatal("a batch whose every line was dropped was not committed with its counts")
 	}
 }
 

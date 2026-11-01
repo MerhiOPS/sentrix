@@ -28,8 +28,8 @@ func (r *ring) push(s domain.CoreSample) {
 
 // since returns samples newer than t, oldest first, at most limit of them.
 // It walks newest-first and stops at t or limit, so a reconnect costs
-// O(limit) and never copies the whole ring (OLD B6: a whole-ring copy per
-// subscribe, under the ingest lock, was 7 MB per keystroke).
+// O(limit) and never copies the whole ring: a whole-ring copy per subscribe would
+// run under the ingest lock and cost megabytes per reconnect.
 func (r *ring) since(t time.Time, limit int) []domain.CoreSample {
 	n := r.next
 	if r.full {

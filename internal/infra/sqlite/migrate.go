@@ -26,7 +26,8 @@ const createMigrationsTable = `CREATE TABLE IF NOT EXISTS schema_migrations (
 // Migrate applies every *.sql file in fsys that is not yet recorded, in
 // lexical order, each in its own transaction together with its record. It
 // first checks the checksum of every applied file and refuses to run if one
-// changed (OLD: a migrator that replayed every file was a production defect).
+// changed: replaying or silently skipping an edited migration would leave
+// databases that claim the same version with different schemas.
 func Migrate(ctx context.Context, db *DB, fsys fs.FS) error {
 	w := db.Writer()
 	if _, err := w.ExecContext(ctx, createMigrationsTable); err != nil {

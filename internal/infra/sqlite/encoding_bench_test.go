@@ -1,10 +1,10 @@
 package sqlite
 
-// Encoding benchmark (PLAN Phase 1): decide how core gauges are stored
+// Encoding benchmark: decide how core gauges are stored
 // before any data exists. SQLite has no column compression; a REAL is always
 // 8 bytes in a record, while an INTEGER takes 1–4 bytes at these magnitudes.
-// So "percent × 100 as INTEGER" is the SQLite analogue of OLD's
-// Float32-rounded-to-2dp saving. Measured, not assumed:
+// So "percent × 100 as INTEGER" is the SQLite form of storing
+// gauges as Float32 rounded to 2 dp. Measured, not assumed:
 //
 //	go test ./internal/infra/sqlite -run '^$' -bench Encoding -benchtime 1x
 

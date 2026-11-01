@@ -24,8 +24,8 @@ type Retention map[DataKind]time.Duration
 
 const day = 24 * time.Hour
 
-// DefaultRetention applies to every tenant until plans (Phase 7) set their
-// own. Raw core outlives the agent's 72 h replay window, so a replayed
+// DefaultRetention is what Plan.Retention starts from: the plan caps every
+// metric kind and sets log retention outright. Raw core outlives the agent's 72 h replay window, so a replayed
 // batch never lands in already-pruned time.
 var DefaultRetention = Retention{
 	DataRawCore:   7 * day,

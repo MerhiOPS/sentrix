@@ -70,7 +70,7 @@ func (d *Dispatcher) Run(ctx context.Context) {
 }
 
 // Deliver sends one job to every channel and records the outcome. Any
-// channel failing marks the event failed (OLD C-M6); the failures say which.
+// channel failing marks the event failed; the failures say which.
 func (d *Dispatcher) Deliver(ctx context.Context, j Job) {
 	var fails []string
 	for _, ch := range j.Channels {

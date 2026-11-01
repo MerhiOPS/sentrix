@@ -11,7 +11,7 @@ const (
 	// compressed body can inflate a thousandfold (gzip bomb).
 	MaxDecompressedBytes = 8 << 20 // 8 MiB
 
-	// MaxSamplesPerBatch caps core samples per batch (OLD A-M5). At a 5 s
+	// MaxSamplesPerBatch caps core samples per batch. At a 5 s
 	// interval this is over an hour of backlog in one request.
 	MaxSamplesPerBatch = 1000
 

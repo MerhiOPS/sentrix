@@ -65,7 +65,7 @@ type seriesResolver struct {
 
 // resolve returns the series key, creating the series if the tenant's
 // ceiling allows. ok=false means "refused by the ceiling": the caller drops
-// and counts the sample; the batch goes on (OLD A-C1).
+// and counts the sample; the batch goes on.
 func (r *seriesResolver) resolve(ctx context.Context, d domain.DetailSample, m domain.DetailMetric) (int64, bool, error) {
 	k := domain.KeyFor(d.Metric, d.Labels)
 	id := seriesID{host: r.hk, metric: k.Metric, hash: k.LabelsHash}

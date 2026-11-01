@@ -6,8 +6,8 @@ import (
 )
 
 // LoginLimiter throttles failed logins per key (account + client address).
-// Its state is bounded (OLD B4: an unbounded limiter map with an O(n²) prune
-// was itself a DoS). When it is full even after pruning, it fails *closed*:
+// Its state is bounded: an unbounded map, or an O(n²) prune of it, would
+// itself be a DoS. When it is full even after pruning, it fails *closed*:
 // keys it cannot track are refused until entries expire. Failing open would
 // let an attacker fill the table with junk keys and then brute-force a real
 // account unthrottled; failing closed only delays legitimate logins during

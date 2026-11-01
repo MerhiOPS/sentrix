@@ -102,7 +102,7 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # Clean-machine acceptance (PLAN Phase 6 and 8): a fresh runner is the
+  # Clean-machine acceptance: a fresh runner is the
   # clean VM. The image's demo must reach live data within 60 s; the .deb
   # packages must install, run under systemd and report.
   docker:

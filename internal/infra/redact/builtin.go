@@ -1,5 +1,5 @@
 // Package redact removes secrets and personal data from log lines at
-// ingest, before storage and before the search index (PLAN Phase 4): data
+// ingest, before storage and before the search index: data
 // that is never stored needs no erasure.
 package redact
 
@@ -11,7 +11,7 @@ import (
 
 // builtin is one always-on rule. A validator, when set, must accept the
 // match too — the regex finds candidates, the validator decides, so an
-// IPv6-shaped timestamp is not mangled (OLD C-M10).
+// IPv6-shaped timestamp is not mangled.
 type builtin struct {
 	name  string
 	re    *regexp.Regexp

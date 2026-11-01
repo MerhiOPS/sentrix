@@ -14,7 +14,7 @@ import (
 
 // tail streams newly stored, redacted lines matching the client's filter.
 // The filter uses the search semantics and is applied in the hub, so the
-// socket carries only what was asked for (OLD B10).
+// socket carries only what was asked for.
 func (a *API) tail(ctx context.Context, c *websocket.Conn, tenant domain.TenantID, m subscribeMsg) error {
 	clauses, err := query.ParseSearch(m.Q)
 	if err != nil {

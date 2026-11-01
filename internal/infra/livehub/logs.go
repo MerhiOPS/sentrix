@@ -6,8 +6,9 @@ import (
 )
 
 // LogFilter is a live tail's filter. It is applied in the hub, with the same
-// semantics as search, so the browser receives only what it asked for (OLD
-// B10: tail filters that were silently ignored).
+// semantics as search, so the browser receives only what it asked for. A
+// filter the server ignored would look applied in the UI and still ship
+// every line.
 type LogFilter struct {
 	Hosts   []domain.HostID // nil: all of the tenant's hosts; empty: none
 	Levels  []domain.Level  // empty: all levels

@@ -56,7 +56,7 @@ type Prepared struct {
 // TxState is what the store reads inside the write transaction for build:
 // the host's counter state and the tenant's log budget left today. Reading
 // both in the transaction that commits the result is what keeps counters
-// and the log quota exact under concurrency and replay (R1; OLD C-M1).
+// and the log quota exact under concurrency and replay (R1).
 type TxState struct {
 	Counters CounterState
 	// LogBudget is bytes the tenant may still store today; negative means
@@ -65,7 +65,7 @@ type TxState struct {
 }
 
 // LogStats are the per-batch log counts the store meters with the batch —
-// including for a batch where every line was dropped or shed (OLD C-M11).
+// including for a batch where every line was dropped or shed.
 type LogStats struct {
 	Received   int
 	Redacted   int
@@ -89,7 +89,7 @@ type CommitResult struct {
 	Conflicts int
 	// SeriesRefused counts detail samples dropped because they would have
 	// created a series past the tenant's ceiling. Existing series are never
-	// refused, and hitting the ceiling never fails the batch (OLD A-C1).
+	// refused, and hitting the ceiling never fails the batch.
 	SeriesRefused int
 	LogsStored    int
 }

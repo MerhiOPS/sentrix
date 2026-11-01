@@ -109,8 +109,8 @@ func EncodeCursor(c LogCursor) string {
 	return base64.RawURLEncoding.EncodeToString([]byte(raw))
 }
 
-// DecodeCursor parses and validates a cursor (OLD B9: a malformed cursor is
-// a 400, never a 500 or a silently different query).
+// DecodeCursor parses and validates a cursor: a malformed cursor is a
+// 400, never a 500 or a silently different query.
 func DecodeCursor(s string) (LogCursor, error) {
 	bad := fmt.Errorf("%w: malformed cursor", domain.ErrInvalid)
 	raw, err := base64.RawURLEncoding.DecodeString(s)

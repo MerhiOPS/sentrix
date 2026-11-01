@@ -1,6 +1,6 @@
 package sqlite
 
-// Assumption tests (PLAN Phase 0): every SQLite behaviour the plan relies
+// Assumption tests: every SQLite behaviour the plan relies
 // on, asserted against the pinned modernc.org/sqlite. If one of these fails
 // after a driver bump, the plan changes before the code does.
 

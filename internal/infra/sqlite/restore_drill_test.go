@@ -39,7 +39,7 @@ func restored(t *testing.T, st *Store) *Store {
 	return NewStore(db)
 }
 
-// TestRestoreReproducesDatasetExactly: Phase 7 acceptance — every table,
+// TestRestoreReproducesDatasetExactly: every table,
 // search index included, has the same rows after backup and restore.
 func TestRestoreReproducesDatasetExactly(t *testing.T) {
 	w := newEraseWorld(t)
@@ -64,8 +64,7 @@ func TestRestoreReproducesDatasetExactly(t *testing.T) {
 	}
 }
 
-// TestBackupUnderConcurrentWritesIsCrossTableConsistent: Phase 7
-// acceptance. A writer commits marker pairs — a sample and a log line with
+// TestBackupUnderConcurrentWritesIsCrossTableConsistent: a writer commits marker pairs — a sample and a log line with
 // the same number, in one batch — while the backup runs. Every restored
 // marker must have its pair: a per-table copy would cut between them.
 func TestBackupUnderConcurrentWritesIsCrossTableConsistent(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"github.com/MerhiOPS/sentrix/internal/domain"
 )
 
-// Channel URLs arrive masked from the use case for every role (OLD B2):
+// Channel URLs arrive masked from the use case for every role:
 // these handlers never see a real URL to leak.
 
 func (a *API) handleListChannels(w http.ResponseWriter, r *http.Request) {

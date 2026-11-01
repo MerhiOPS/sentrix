@@ -13,7 +13,7 @@ const maxReadPerPoll = 4 << 20
 
 // tracker follows one file: an open handle retained across polls, so when
 // the path is rotated the old file can still be drained to its end before
-// the new one is read (OLD C-C2).
+// the new one is read.
 type tracker struct {
 	path   string
 	key    string

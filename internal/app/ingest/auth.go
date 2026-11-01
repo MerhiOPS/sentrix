@@ -17,7 +17,7 @@ import (
 // Lookup is by SHA-256 of the 32-byte random credential. A timing difference
 // in that lookup can reveal, at most, something about a hash prefix — not
 // the secret — so the usual constant-time comparison buys nothing here and is
-// deliberately not performed (PLAN Phase 1 asked for it; LOG.md says why not).
+// deliberately not performed.
 type Authenticator struct {
 	store CredentialStore
 	ttl   time.Duration

@@ -83,7 +83,7 @@ func (s *stack) stored(t *testing.T, id agent.Identity) int {
 	return len(ss)
 }
 
-// TestServerOutageLosesNothing: Phase 6 acceptance, in-process. The server
+// TestServerOutageLosesNothing is the outage scenario in-process. The server
 // vanishes mid-run; the agent keeps sampling into the WAL, reconnects with
 // backoff and replays: rows stored equal samples collected, none twice.
 // The two-minute version against the real binaries is scripts/outage.sh.

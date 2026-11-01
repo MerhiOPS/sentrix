@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-// Server timeouts. The ingest port faces the internet (OLD B15): a client
+// Server timeouts. The ingest port faces the internet: a client
 // that dribbles headers or holds idle connections must not pin goroutines.
 // There is no WriteTimeout — a slow but honest agent ack should not be cut.
 const (

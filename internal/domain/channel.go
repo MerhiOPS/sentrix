@@ -34,7 +34,7 @@ func (c Channel) MaskedURL() string {
 }
 
 // MaskSentinel marks a secret the client did not change: an update carrying
-// a masked URL keeps the stored one (OLD B2).
+// a masked URL keeps the stored one.
 const MaskSentinel = "••••"
 
 // IsMasked reports whether a URL from a client is the masked placeholder.

@@ -11,10 +11,10 @@ import (
 	"time"
 )
 
-// TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter backs the Phase 7
+// TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter backs the
 // backup design: VACUUM INTO runs in one read transaction, so a backup taken
 // while a writer commits paired rows into two tables must contain both rows
-// of every pair, never one. OLD's ClickHouse BACKUP failed exactly this.
+// of every pair, never one. A per-table backup fails exactly this.
 func TestAssumeVacuumIntoIsConsistentUnderConcurrentWriter(t *testing.T) {
 	dir := t.TempDir()
 	db, err := Open(context.Background(), filepath.Join(dir, "live.db"))

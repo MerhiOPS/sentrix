@@ -95,7 +95,7 @@ func TestSourceFollowsWindow(t *testing.T) {
 	}
 }
 
-// TestRateDividesByCoveredSpan: OLD B5. Samples at 0 s and 5 s, a gap, then
+// TestRateDividesByCoveredSpan: samples at 0 s and 5 s, a gap, then
 // 55 s — the rate is growth / 55 s, not growth / the 60 s bucket.
 func TestRateDividesByCoveredSpan(t *testing.T) {
 	m, f, s := rig()

@@ -7,7 +7,7 @@ export interface Point {
 /**
  * A bounded, time-ordered buffer of points keyed by timestamp. Upserting a
  * timestamp that is already present replaces it — reconnect backfill
- * overlaps what the chart already has, and must not duplicate it (OLD B7).
+ * overlaps what the chart already has, and must not duplicate it.
  */
 export class TimeBuffer {
   private points: Point[] = [];

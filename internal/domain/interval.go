@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-// Sampling interval bounds (PLAN: 5 s default, 1–60 s configurable). An
+// Sampling interval bounds (5 s default, 1–60 s configurable). An
 // interval must be whole seconds so timestamps snap exactly to its grid.
 const (
 	MinInterval = time.Second

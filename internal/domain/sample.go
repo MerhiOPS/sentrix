@@ -34,7 +34,7 @@ type CoreSample struct {
 }
 
 // Validate rejects samples that would poison storage or counter state:
-// non-finite or out-of-range gauges (OLD A-M4) and a missing timestamp.
+// non-finite or out-of-range gauges and a missing timestamp.
 func (s CoreSample) Validate() error {
 	if s.TS.IsZero() {
 		return fmt.Errorf("%w: sample has no timestamp", ErrInvalid)

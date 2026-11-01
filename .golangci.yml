@@ -1,7 +1,7 @@
 version: "2"
 
-# Validated in CI with `golangci-lint config verify` before linting: OLD's CI
-# stayed red for days on a config key the linter no longer accepted.
+# Validated in CI with `golangci-lint config verify` before linting, so a
+# config key the linter no longer accepts fails loudly instead of being ignored.
 linters:
   default: standard # errcheck, govet, ineffassign, staticcheck, unused
   enable:

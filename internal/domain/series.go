@@ -36,7 +36,7 @@ func (l Labels) Validate() error {
 
 // Canonical renders labels as sorted key=value pairs, so that the same set
 // always has one spelling regardless of map order or how the JSON was
-// formatted (PLAN Phase 3: {"core":"3"} and {"core": "3"} are one series).
+// formatted: {"core":"3"} and {"core": "3"} are one series.
 // Keys and values are quoted, so "=" or "," inside them cannot collide.
 func (l Labels) Canonical() string {
 	keys := make([]string, 0, len(l))

@@ -22,7 +22,7 @@ type alertRuleDTO struct {
 	Channels    []int64  `json:"channels"`
 	Enabled     bool     `json:"enabled"`
 	// Inert is true when the rule matches no enabled host: it can never
-	// fire, and the UI says so (OLD C-M12).
+	// fire, and the UI says so.
 	Inert bool `json:"inert"`
 }
 

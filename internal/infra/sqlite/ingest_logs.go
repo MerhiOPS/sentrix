@@ -47,7 +47,7 @@ func writeLogs(ctx context.Context, tx *batchTx, tk, hk int64, lines []domain.Lo
 }
 
 // recordLogUsage meters the batch — even when no line was stored, so lines
-// dropped, shed or redacted away are always attributable (OLD C-M11).
+// dropped, shed or redacted away are always attributable.
 func recordLogUsage(ctx context.Context, tx *batchTx, tk, hk, day int64, p ingest.Prepared) error {
 	st := p.LogStats
 	if st.Received == 0 {

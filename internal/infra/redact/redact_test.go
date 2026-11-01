@@ -35,7 +35,7 @@ func TestBuiltinsRedactSecretsAndPII(t *testing.T) {
 		"mail to jane.doe+x@example.co.uk failed":                  "mail to [EMAIL] failed",
 		"peer 10.0.0.12 refused":                                   "peer [IP] refused",
 		"peer ::1 and fe80::1%eth0 and 2001:db8::8a2e:370:7334":    "peer [IP] and [IP] and [IP]",
-		"at 12:34:56 retry":                                        "at 12:34:56 retry",         // a time, not IPv6 (OLD C-M10)
+		"at 12:34:56 retry":                                        "at 12:34:56 retry",         // a time, not IPv6
 		"nic aa:bb:cc:dd:ee:ff up":                                 "nic aa:bb:cc:dd:ee:ff up",  // a MAC, not IPv6
 		"version 999.1.1.1 shipped":                                "version 999.1.1.1 shipped", // not a valid IPv4
 		"plain line with nothing secret":                           "plain line with nothing secret",
@@ -58,7 +58,7 @@ func TestEveryFieldIsRedacted(t *testing.T) {
 	}
 	k := kept[0]
 	if strings.Contains(k.Source, "leaky") || k.Labels["user"] != maskEmail || k.Labels["peer"] != maskIP || k.Labels["svc"] != "api" {
-		t.Fatalf("source %q labels %v: secrets in source/labels survived (OLD A-C2)", k.Source, k.Labels)
+		t.Fatalf("source %q labels %v: secrets in source/labels survived", k.Source, k.Labels)
 	}
 	if line.Labels["user"] != "jane@example.com" {
 		t.Fatal("Redact mutated the caller's labels map")

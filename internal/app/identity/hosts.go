@@ -21,7 +21,7 @@ type CredentialCache interface {
 
 // Hosts is the host lifecycle use case. A disabled host's agent is refused
 // at once (its cached credential is dropped, not left to expire) and the
-// host is no longer evaluated by alerting (OLD C-M2).
+// host is no longer evaluated by alerting.
 type Hosts struct {
 	repo  HostRepo
 	cache CredentialCache

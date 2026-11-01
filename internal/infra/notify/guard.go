@@ -33,7 +33,7 @@ var blockedPrefixes = []netip.Prefix{
 }
 
 // Allowed reports whether a notification may be sent to addr. It is the
-// deny list from PLAN Phase 5: loopback, link-local (169.254.169.254, the
+// deny list from PLAN §5 (alerts): loopback, link-local (169.254.169.254, the
 // cloud metadata service, included), RFC 1918 and IPv6 ULA, CGNAT,
 // 0.0.0.0/8, multicast, and IPv4-mapped IPv6 (which would smuggle any IPv4
 // address past an IPv6-only check).

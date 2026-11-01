@@ -17,7 +17,7 @@ type Process struct {
 
 // ProcessSnapshot is the top processes by CPU and by RSS at one instant.
 // It is a snapshot, not a time series: PIDs recycle, and per-process series
-// would grow cardinality forever (OLD DESIGN §4.2).
+// would grow cardinality forever.
 type ProcessSnapshot struct {
 	TS    time.Time
 	Procs []Process

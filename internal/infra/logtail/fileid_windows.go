@@ -10,7 +10,7 @@ import (
 
 // openShared opens with FILE_SHARE_DELETE (plus read/write). Without it the
 // retained handle would make the writer's rotation rename fail — the
-// rotation fix would turn lost lines into a broken rotation (OLD C-C2).
+// rotation fix would turn lost lines into a broken rotation.
 func openShared(path string) (*os.File, error) {
 	p, err := syscall.UTF16PtrFromString(path)
 	if err != nil {

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Phase 6 acceptance with the real binaries: kill -9 the server for two
+# Outage test with the real binaries: kill -9 the server for two
 # minutes while an agent keeps sampling, restart it, and check that every
 # 5 s slot from the first sample to the last was stored exactly once.
 #

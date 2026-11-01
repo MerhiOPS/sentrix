@@ -7,7 +7,7 @@ import (
 
 // SecretLen is the length of enrollment secrets and credentials. 32 random
 // bytes need no slow hash: brute force is infeasible, and Argon2 per batch
-// would make every ingest request a CPU DoS (PLAN Phase 1).
+// would make every ingest request a CPU DoS.
 const SecretLen = 32
 
 // NewSecret returns SecretLen random bytes.

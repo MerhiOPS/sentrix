@@ -92,7 +92,7 @@ func TestMetricsPointCapAndNullGaps(t *testing.T) {
 	}
 	day := span(now.Add(-24*time.Hour), now)
 	// Without step the step is automatic (~300 points): bounded by
-	// construction, so it is served, never unbounded (OLD B8).
+	// construction, so it is served, never unbounded.
 	res = r.call(t, "GET", base+day, c, "")
 	var auto frameDTO
 	_ = json.Unmarshal(res.body, &auto)

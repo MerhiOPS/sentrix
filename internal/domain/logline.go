@@ -79,7 +79,7 @@ func (l LogLine) Validate() error {
 }
 
 // Size is the line's billable size in bytes: what the log quota counts
-// (PLAN Phase 4: quotas are bytes, never lines).
+// (quotas are bytes, never lines).
 func (l LogLine) Size() int {
 	n := len(l.Message) + len(l.Source)
 	for k, v := range l.Labels {

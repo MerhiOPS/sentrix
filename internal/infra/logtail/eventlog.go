@@ -17,7 +17,7 @@ const eventLogBatch = 500
 
 // EventLogSource polls Windows Event Log channels with `wevtutil`, tracking
 // the last EventRecordID per channel. Security is not a default channel: it
-// needs membership of Event Log Readers (PLAN Phase 4).
+// needs membership of Event Log Readers.
 type EventLogSource struct {
 	channels  []string
 	run       runner

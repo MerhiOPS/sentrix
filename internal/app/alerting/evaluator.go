@@ -191,7 +191,7 @@ func enabled(rules []domain.AlertRule) []domain.AlertRule {
 }
 
 // targets are the enabled hosts a rule applies to. A disabled host is never
-// evaluated (OLD C-M2): it cannot fire, and a firing alert on it stays as it
+// evaluated: it cannot fire, and a firing alert on it stays as it
 // was rather than resolving on missing data.
 func targets(r domain.AlertRule, hosts []domain.Host) []domain.Host {
 	want := map[domain.HostID]bool{}

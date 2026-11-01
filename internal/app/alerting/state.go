@@ -91,8 +91,8 @@ func event(rule domain.AlertRule, prev, next domain.RuleHostState, obs Observati
 }
 
 // shouldNotify decides an event's notification: never while silenced; a
-// repeat firing inside the cooldown is suppressed, a resolve never is (OLD:
-// a cooldown that swallowed resolves left alerts open in the chat).
+// repeat firing inside the cooldown is suppressed, a resolve never is: a
+// cooldown that swallowed resolves would leave alerts open in the chat.
 func shouldNotify(rule domain.AlertRule, st domain.RuleHostState, ev domain.AlertEvent, silenced bool) bool {
 	if silenced {
 		return false

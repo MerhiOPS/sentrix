@@ -11,7 +11,7 @@ const (
 	// Acked: stored, or stored before (replay). Delete it.
 	Acked Outcome = iota
 	// Dropped: permanently invalid. Delete it, count it, never resend —
-	// resending would replay the same refused head forever (OLD C-Minor).
+	// resending would replay the same refused head forever.
 	Dropped
 	// Stopped: credential unknown or host disabled. Keep buffering, stop
 	// sending, log loudly; only a re-enrolment or re-enable fixes it.

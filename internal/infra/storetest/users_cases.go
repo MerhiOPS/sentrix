@@ -83,7 +83,7 @@ func testSessionLifecycle(t *testing.T, st Stores) {
 	}
 }
 
-// userCrossCases extend crossCases for the ports added in Phase 2.
+// userCrossCases extend crossCases for the user, session and read ports.
 var userCrossCases = map[string]crossCase{
 	"LatestReader.LatestCore": func(ctx context.Context, st Stores, a, b fixture) string {
 		got, err := st.LatestCore(ctx, b.scope)

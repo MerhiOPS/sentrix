@@ -27,8 +27,8 @@ type cacheEntry struct {
 }
 
 // Redactor applies the built-in rules, then the tenant's own, to every field
-// of a line: message, source and every label value. OLD's redaction test
-// checked the message only, and labels leaked past it green (A-C2).
+// of a line: message, source and every label value. A test of the message alone
+// would stay green while secrets leaked through labels.
 type Redactor struct {
 	src   RuleSource
 	ttl   time.Duration
