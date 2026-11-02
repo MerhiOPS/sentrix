@@ -29,18 +29,21 @@ for _ in $(seq 1 120); do
 done
 [ "${LIVE:-0}" -ge 4 ] || { docker logs "$CID"; echo "FAIL: no live data within 60 s"; exit 1; }
 # The demo's uptime monitors check services on loopback inside the
-# container; every one (ping included, where the runtime allows ping
-# sockets) must come up.
+# container: every one (ping included, where the runtime allows ping
+# sockets) must have been checked, and be up — except the payments API,
+# which the demo takes down for 2 minutes in every 10 on purpose.
 for _ in $(seq 1 120); do
     STATE=$(curl -sf -b /tmp/sx-jar "$API/monitors" | python3 -c '
 import json, sys
 ms = json.load(sys.stdin)["monitors"]
-print(len(ms), sum(1 for m in ms if m["state"]["status"] == "up"))')
+checked = [m for m in ms if m["state"]["status"] in ("up", "down")]
+ok = [m for m in checked if m["state"]["status"] == "up" or m["name"] == "Payments API"]
+print(len(ms), len(checked), len(ok))')
     set -- $STATE
-    if [ "$1" -ge 4 ] && [ "$1" -eq "$2" ]; then
-        python3 -c "print(f'PASS: all $1 demo monitors up: {$(date +%s.%N)-$START:.1f} s')"
+    if [ "$1" -ge 4 ] && [ "$1" -eq "$2" ] && [ "$1" -eq "$3" ]; then
+        python3 -c "print(f'PASS: all $1 demo monitors checked and up as expected: {$(date +%s.%N)-$START:.1f} s')"
         exit 0
     fi
     sleep 0.5
 done
-docker logs "$CID"; echo "FAIL: demo monitors not all up within 60 s ($STATE)"; exit 1
+docker logs "$CID"; echo "FAIL: demo monitors not checked and up within 60 s (monitors, checked, as expected: $STATE)"; exit 1
