@@ -102,10 +102,33 @@ func TestCheckPlatform(t *testing.T) {
 	assertFlagged(t, vs, "a/linux_too.go", "a/sub_untagged.go", "a/untagged.go")
 }
 
+func TestCheckCodemap(t *testing.T) {
+	root := writeTree(t, map[string]string{
+		"internal/a/a.go":      goFile(""),
+		"internal/b/b.go":      goFile(""),
+		"internal/b/c/c.go":    goFile(""),
+		"cmd/tool/main.go":     goFile(""),
+		"internal/b/b_test.go": goFile(""),
+		codemapFile:            "| `internal/a/` | a |\n| `internal/b/` | b, see `internal/b/b.go` and `internal/b/gone.go` |\n| `cmd/tool/` | tool |\n",
+	})
+	vs, err := checkCodemap(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertFlagged(t, vs, "internal/b/c", codemapFile) // packages, then the paths the map names
+	if !strings.Contains(vs[0].Msg+vs[1].Msg, "internal/b/gone.go") {
+		t.Fatalf("violations %v: the missing file named by the map is not reported", vs)
+	}
+	if vs, _ := checkCodemap(writeTree(t, map[string]string{"x/x.go": goFile("")})); len(vs) != 1 {
+		t.Fatalf("no code map: %v, want one violation", vs)
+	}
+}
+
 func TestRunCountsAcrossChecks(t *testing.T) {
 	root := writeTree(t, map[string]string{
 		"internal/domain/up.go": goFile("", testModule+"/internal/infra/sqlite"),
 		"internal/app/q.go":     "package p\n\nvar q = \"SELECT 1\"\n",
+		codemapFile:             "`internal/domain/` `internal/app/`",
 	})
 	n, err := run(root, "all")
 	if err != nil {

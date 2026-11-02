@@ -1,5 +1,6 @@
-// Package notify delivers alert notifications to webhooks and Slack through
-// an HTTP client that refuses to reach internal addresses (infra/netguard).
+// Package notify delivers alert and uptime notifications to webhooks and
+// Slack through an HTTP client that refuses to reach internal addresses
+// (infra/netguard).
 package notify
 
 import (

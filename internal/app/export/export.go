@@ -1,6 +1,7 @@
 // Package export streams a tenant's own data out (data portability):
-// metrics, logs and alert events, in bounded pages through the same scoped
-// readers the dashboard uses, so an export can never see another tenant.
+// metrics, logs, alert events and uptime results and incidents, in bounded
+// pages through the same scoped readers the dashboard uses, so an export
+// can never see another tenant.
 package export
 
 import (

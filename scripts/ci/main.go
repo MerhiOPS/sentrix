@@ -1,9 +1,9 @@
 // Command ci runs the repository checks that CONTRIBUTING.md says are enforced by
-// tooling rather than review: file length, import layering, SQL placement
-// and platform imports.
+// tooling rather than review: file length, import layering, SQL placement,
+// platform imports and the code map.
 //
 //	go run ./scripts/ci all
-//	go run ./scripts/ci lines|layering|rawsql|platform
+//	go run ./scripts/ci lines|layering|rawsql|platform|codemap
 package main
 
 import (
@@ -22,9 +22,10 @@ var checks = map[string]check{
 	"layering": checkLayering,
 	"rawsql":   func(root, _ string) ([]Violation, error) { return checkRawSQL(root) },
 	"platform": func(root, _ string) ([]Violation, error) { return checkPlatform(root) },
+	"codemap":  func(root, _ string) ([]Violation, error) { return checkCodemap(root) },
 }
 
-var order = []string{"lines", "layering", "rawsql", "platform"}
+var order = []string{"lines", "layering", "rawsql", "platform", "codemap"}
 
 func main() {
 	if len(os.Args) != 2 {

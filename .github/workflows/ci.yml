@@ -64,7 +64,7 @@ jobs:
           GOOS=linux   GOARCH=amd64 go build ./...
           GOOS=windows GOARCH=amd64 go build ./...
 
-      - name: repository checks (lines, layering, rawsql, platform)
+      - name: repository checks (lines, layering, rawsql, platform, codemap)
         if: runner.os == 'Linux'
         run: go run ./scripts/ci all
 

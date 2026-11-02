@@ -13,7 +13,9 @@ Enforced by `go run ./scripts/ci all`, not by review. A violation is a bug.
 Applies to `.go`, `.ts`, `.tsx`, `.sql`. Exempt: generated code (`*.gen.ts`,
 `*_gen.go`) and `_test.go` / `*.test.ts`. A file growing past 300 lines is
 doing more than one thing — split it along that seam, do not shuffle lines
-into a helper to get under the number.
+into a helper to get under the number. Name the parts `<topic>_<role>.go` so
+they sort together, and keep `docs/CODEMAP.md` current: CI fails when a
+package is missing from it or it names a file that does not exist.
 
 ### 2. Single Responsibility Principle
 

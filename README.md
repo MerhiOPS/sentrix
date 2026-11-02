@@ -154,7 +154,8 @@ cd web && npm ci && npm test && npm run build
 go build -o sentrix-server ./cmd/sentrix-server && (cd web && npx playwright install chromium && npm run e2e)
 ```
 
-Plan and per-phase build log: [`docs/PLAN.md`](docs/PLAN.md),
+Where things are: [`docs/CODEMAP.md`](docs/CODEMAP.md) (every package, and
+the files to open for each flow). Plan and per-phase build log: [`docs/PLAN.md`](docs/PLAN.md),
 [`docs/LOG.md`](docs/LOG.md). Conventions the code follows (and CI
 enforces): [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
