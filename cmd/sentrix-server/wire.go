@@ -27,7 +27,7 @@ import (
 
 // Composition constants.
 const (
-	authTTL         = 30 * time.Second // a disabled host keeps sending at most this long
+	authTTL         = 30 * time.Second // credential cache; a disabled host is refused at once by the store
 	authCache       = 10_000
 	hashParallel    = 2  // concurrent Argon2id operations: 2 × 46 MiB
 	loginFailures   = 5  // per account and client

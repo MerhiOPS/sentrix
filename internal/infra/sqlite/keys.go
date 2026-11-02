@@ -32,6 +32,27 @@ func tenantKey(ctx context.Context, q rowQuerier, s domain.Scope) (int64, error)
 	return key, nil
 }
 
+// enabledHostKey is hostKey for a write: a disabled host is ErrForbidden.
+// Checked inside the batch transaction, so a credential cached before the
+// host was disabled (by another process, or a missed invalidation) still
+// cannot store anything.
+func enabledHostKey(ctx context.Context, q rowQuerier, tenantKey int64, h domain.HostID) (int64, error) {
+	var key int64
+	var disabled sql.NullInt64
+	err := q.QueryRowContext(ctx, `SELECT key, disabled_at FROM hosts WHERE tenant_key = ? AND id = ?`,
+		tenantKey, encID(domain.ID(h))).Scan(&key, &disabled)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, fmt.Errorf("host: %w", domain.ErrNotFound)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("resolve host: %w", err)
+	}
+	if disabled.Valid {
+		return 0, fmt.Errorf("%w: host is disabled", domain.ErrForbidden)
+	}
+	return key, nil
+}
+
 // hostKey resolves a host within a tenant. Binding tenant_key is the
 // isolation: another tenant's host id is simply not found.
 func hostKey(ctx context.Context, q rowQuerier, tenantKey int64, h domain.HostID) (int64, error) {

@@ -22,6 +22,9 @@ func (s *Store) CommitBatch(_ context.Context, sc domain.Scope, id domain.HostID
 	if err != nil {
 		return ingest.CommitResult{}, err
 	}
+	if h.h.DisabledAt != nil { // as SQLite: the store, not a cached credential, decides
+		return ingest.CommitResult{}, fmt.Errorf("%w: host is disabled", domain.ErrForbidden)
+	}
 	if seq > domain.MaxCounter {
 		return ingest.CommitResult{}, fmt.Errorf("seq %d exceeds storage range", seq)
 	}

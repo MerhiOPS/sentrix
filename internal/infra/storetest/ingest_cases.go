@@ -183,3 +183,31 @@ func testGaugePrecision(t *testing.T, st Stores) {
 		t.Fatalf("cpu = %v, want %v (two-decimal precision)", got, want)
 	}
 }
+
+// testCommitRefusedForDisabledHost: the store decides, not the caller's
+// cached credential. A batch for a disabled host stores nothing.
+func testCommitRefusedForDisabledHost(t *testing.T, st Stores) {
+	ctx := context.Background()
+	f := newFixture(t, st, "a")
+	if _, err := st.CommitBatch(ctx, f.scope, f.host, 1, prepared(T0, []int{0}, []uint64{1})); err != nil {
+		t.Fatal(err)
+	}
+	at := T0.Add(time.Minute)
+	if err := st.SetHostDisabled(ctx, f.scope, f.host, &at); err != nil {
+		t.Fatal(err)
+	}
+	before := countSamples(ctx, st, f)
+	_, err := st.CommitBatch(ctx, f.scope, f.host, 2, prepared(T0, []int{1}, []uint64{2}))
+	if !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("batch for a disabled host: %v, want ErrForbidden", err)
+	}
+	if after := countSamples(ctx, st, f); after != before {
+		t.Fatalf("a disabled host stored samples: %d → %d", before, after)
+	}
+	if err := st.SetHostDisabled(ctx, f.scope, f.host, nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := st.CommitBatch(ctx, f.scope, f.host, 2, prepared(T0, []int{1}, []uint64{2})); err != nil {
+		t.Fatalf("re-enabled host refused: %v", err)
+	}
+}

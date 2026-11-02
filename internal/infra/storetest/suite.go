@@ -24,6 +24,7 @@ func Run(t *testing.T, newStores Factory) {
 		"ingest/gauge-precision":            testGaugePrecision,
 		"ingest/health-persisted":           testHealthPersisted,
 		"ingest/latest-never-backwards":     testLatestNeverGoesBackwards,
+		"ingest/disabled-host-refused":      testCommitRefusedForDisabledHost,
 		"users/email-unique-across-tenants": testUserEmailUniqueAcrossTenants,
 		"users/find-login":                  testFindLoginReturnsTenantAndHash,
 		"sessions/lifecycle":                testSessionLifecycle,

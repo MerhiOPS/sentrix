@@ -25,7 +25,7 @@ func (s *Store) CommitBatch(ctx context.Context, sc domain.Scope, host domain.Ho
 	if err != nil {
 		return ingest.CommitResult{}, err
 	}
-	hk, err := hostKey(ctx, tx, tk, host)
+	hk, err := enabledHostKey(ctx, tx, tk, host)
 	if err != nil {
 		return ingest.CommitResult{}, err
 	}

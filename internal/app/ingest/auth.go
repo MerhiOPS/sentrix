@@ -33,8 +33,10 @@ type cached struct {
 	expires time.Time
 }
 
-// NewAuthenticator builds the cache. ttl bounds how long a disabled host can
-// keep sending after Invalidate was missed; max bounds memory.
+// NewAuthenticator builds the cache. ttl bounds how long a cached entry is
+// trusted for routing; it never lets a disabled host store anything, since
+// the store refuses a disabled host inside the batch transaction. max
+// bounds memory.
 func NewAuthenticator(store CredentialStore, ttl time.Duration, max int, now func() time.Time) *Authenticator {
 	return &Authenticator{store: store, ttl: ttl, max: max, now: now, cache: map[[sha256.Size]byte]cached{}}
 }

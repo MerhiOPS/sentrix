@@ -117,7 +117,9 @@ type DiskGuard interface {
 // Store persists a batch as one unit of work: raw rows, latest values,
 // counter state, host liveness and the batch_seq record, in one transaction.
 // An adapter that cannot do this atomically must document which half can
-// land without the other (PLAN §4).
+// land without the other (PLAN §4). A disabled host is refused with
+// domain.ErrForbidden inside the transaction, whatever the caller's cached
+// credential says.
 type Store interface {
 	CommitBatch(ctx context.Context, s domain.Scope, host domain.HostID, seq uint64, build BuildFunc) (CommitResult, error)
 }
