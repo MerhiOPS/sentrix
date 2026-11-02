@@ -18,7 +18,8 @@ complete adapter implements:
 | read side | `query.HostReader`, `CoreReader`, `LatestReader`, `RollupReader`, `DetailReader`, `ProcessReader`, `LogReader` |
 | redaction | `redaction.RuleRepo` |
 | alerting | `alerting.RuleRepo`, `ChannelRepo`, `SilenceRepo`, `StateRepo`, `BucketReader`, `TenantLister`, `Sweeper` |
-| retention | `retention.Store` |
+| uptime | `uptime.MonitorRepo`, `StateRepo` (`RecordCheck`), `HistoryReader`, `ScheduleReader`, `Sweeper` |
+| retention | `retention.Store`, `retention.MonitorStore` |
 
 Operator-only work (erasure, backup) is on `compliance.ErasureStore` and the
 SQLite `Backup`/`Restore`; those are inherently storage-specific.
@@ -44,6 +45,13 @@ catch a deliberately tenant-blind adapter.
 Adapter-specific tests stay in the adapter: the SQLite package also runs the
 whole contract through a recording driver and fails on any statement that
 touches a tenant table without binding `tenant_key`.
+
+`uptime.StateRepo.RecordCheck` has the same shape as `CommitBatch`: the
+result, the hourly rollup (including time moved from up to down when an
+incident is confirmed), metering, the incident, the events and the state,
+all-or-nothing, refused unless the state revision is still the one the
+check started from. An adapter without transactions must rebuild those
+guarantees, as below.
 
 ## The `CommitBatch` caveat
 

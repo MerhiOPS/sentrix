@@ -13,6 +13,8 @@ Agreement — there is no customer to sign one.
 | logs (message, source, labels) | only the sources an operator lists (`--log-file`, `--journald`, `--eventlog`) | often — usernames, emails, IPs |
 | users (email, Argon2id password hash, role) and sessions (SHA-256 of the token) | the operator / login | yes (email) |
 | alert rules, channels (webhook/Slack URLs — credentials), events | admins | no |
+| uptime monitors (name, target URL or host) | admins | the URL can carry customer data |
+| uptime check results (time, outcome, error class, latency, status code, certificate expiry), hourly rollups, incidents, notification events | the server's own checks | no — **never a response body**; a failure is stored as a class (`timeout`, `tls`, …), never a raw error |
 | metering (per tenant per day: samples, log bytes, distinct hosts) | the write path | no (aggregates) |
 | audit log (operator actions; subjects stored as SHA-256 of their id) | operator commands | no |
 
@@ -36,6 +38,13 @@ sets logs; `sentrix-server tenant plan`):
 | 1-minute rollups | 30 days |
 | hourly rollups | 400 days |
 | logs (and their search index entries) | 14 days |
+| uptime check results | 30 days |
+| uptime hourly rollups | 400 days |
+| uptime incidents (once ended) and notification events | 400 days |
+
+Uptime data is pruned per (tenant, monitor), and capped by
+`metrics_retention_days` like every metric kind. An open incident is never
+pruned.
 
 `ttl_overdue` in `GET /api/v1/system` is the age of the oldest row past its
 retention: it should stay near zero, and is what shows a stuck janitor.
@@ -77,6 +86,11 @@ inside the index would not show up as the canary; the `optimize` step is what
 removes it. Usage aggregates (per tenant per day) are kept after a host is
 erased: they hold no data about the host.
 
+**Uptime monitors** go with their tenant: tenant erasure plants the canary
+in a monitor, and the post-check scans for every monitor target URL the
+tenant used, except a target another tenant also monitors (that tenant's
+copy is its own data, not residue).
+
 ## Backups
 
 `sentrix-server backup` (see `docs/restore-drill.md`). A backup is a full
@@ -87,5 +101,6 @@ them).
 
 ## Export
 
-Admins can export their tenant's own metrics (raw, within retention), logs
-and alert events: `GET /api/v1/export?table=…&from=…&to=…&format=csv|ndjson`.
+Admins can export their tenant's own metrics (raw, within retention), logs,
+alert events, uptime check results and incidents
+(`table=monitor_results|monitor_incidents`): `GET /api/v1/export?table=…&from=…&to=…&format=csv|ndjson`.

@@ -5,6 +5,133 @@ why. Newest first.
 
 ---
 
+## Phase 9 — Uptime monitoring · 2026-11-02
+
+**Landed**
+- **Checks** run by the server (`infra/probe`): HTTP(S) with accepted
+  status ranges, keyword present/absent in the first 1 MiB, time to first
+  byte, a fresh connection every check, at most five redirects; certificate
+  validity and expiry, the earliest `NotAfter` in the **verified chain**;
+  TCP connect; ping over unprivileged ICMP sockets (`golang.org/x/net/icmp`,
+  no capability). Failures are stored as error classes only.
+- **SSRF boundary** moved to `infra/netguard` and shared with the notifier:
+  the same dial-time check on every connection, redirect hops included, a
+  refused address fails as `blocked` before any packet. `Policy.AllowPrivate`
+  (`--uptime-allow-private`) admits private targets; link-local and two
+  metadata addresses hidden inside ranges it opens (Alibaba's
+  `100.100.100.200`, AWS's `fd00:ec2::254`) stay refused.
+- **State machine** (`domain.StepMonitor`): a failure is re-checked after
+  min(10 s, interval/3) and opens an incident only when the re-checks fail
+  too; the incident starts at the first failure; an unknown result changes
+  nothing; certificate warnings are a state of their own.
+- **Uptime arithmetic**: each result accounts for the time since the
+  previous check (at most two intervals), by the state it saw; on
+  confirmation the window since the first failure moves from up to down,
+  so attributed downtime equals incident duration (tested over a full
+  cycle). Uptime = up / (up + down) over hourly rollups; no data is a dash,
+  never 100 %; the read view adds the time since the last check.
+- **Scheduler**: stable per-monitor phase (splitmix64), resume after a
+  restart without a burst, bounded workers with a per-tenant quarter,
+  never two checks of one monitor at once, skipped and late checks counted.
+  A state **revision** makes a result written while its monitor was paused,
+  edited or deleted fail as stale instead of overwriting newer state.
+- **Reference targets** (`--uptime-reference`): a network-level failure
+  while no reference answers is stored as unknown, so one lost uplink does
+  not page every tenant.
+- Storage (`0007_uptime.sql`) on both stores under the contract suite, with
+  cross-tenant cases for all 13 scoped monitor methods; plans
+  (`max_monitors`, `min_check_interval`), metering, retention, tenant
+  erasure (target URLs are post-check needles, except targets another
+  tenant also monitors), export, silences on a monitor, notifications with
+  a documented `MonitorWebhook` body validated against the spec in a test.
+- API (`/monitors…`), dashboard (Uptime list, monitor page, form), demo
+  monitors on loopback services (one goes down 2 minutes in every 10),
+  browser tests, the Docker smoke test requiring every demo monitor checked.
+  The README screenshots show a real demo cycle: the payments API's
+  scheduled 2-minute outage recorded as an incident of exactly 2 m 0 s.
+
+**Changed from the plan**
+- Hourly rollup instead of daily: a 24 h uptime is then right to the hour;
+  daily bars are folded from it.
+- The dashboard polls (15 s) instead of receiving monitor changes over the
+  WebSocket: checks run at most every 30 s.
+- Demo mode admits private targets, not only loopback: its data is
+  synthetic, as with the plain-HTTP dashboard it already allows.
+
+**Acceptance**
+- checked on a fake clock at its phase offset, never twice at once (test) ✅
+- a restart does not check every monitor at once (test) ✅
+- one failed check opens no incident; a confirmed one does; recovery closes
+  it and notifies once (test) ✅
+- an incident open at a restart is closed and notified once after it — the
+  end-to-end test restarts the real stack mid-incident ✅
+- references down → unknown, no transition (test) ✅
+- loopback by address, by name, and a redirect to it: `blocked`, nothing
+  connected (tests) ✅; `--uptime-allow-private` still refuses
+  `169.254.169.254` (test) ✅
+- keyword present/absent/case/past the cap (test) ✅; expired, wrong-name,
+  untrusted certificate and plain HTTP behind https fail as `tls`, an
+  intermediate expiring first sets the expiry (test) ✅
+- ping to loopback over an unprivileged socket in Linux CI, failing (not
+  skipping) without one ✅
+- uptime with an incident, a pause and an unknown gap matches a
+  hand-computed value (test) ✅
+- tenant isolation on every scoped method and API route (tests) ✅
+- over `max_monitors` creation refused, existing monitors kept (test) ✅
+- erasure post-check fails when a monitor URL is left behind (test) ✅
+- results, rollups and ended incidents pruned at retention, open ones kept
+  (test) ✅
+- ingest ceiling with 1 000 monitors checking, both published ✅ (below)
+
+**Measured** (i5-13400F)
+- `BenchmarkUptimeChecks`: **9 400 checks/s** through `RecordCheck` from 8
+  writers, **32 B** on disk per check including rollups. At one check a
+  minute the database would carry hundreds of thousands of monitors; the
+  real limit is the probes (64 workers by default).
+- `BenchmarkIngestCeiling`: 1 170–1 185 batches/s; with 1 000 monitors
+  checked every minute on the same database (`…WithUptime`): 1 200–1 205.
+  No measurable cost. These replace Phase 6's 840–940: the benchmark had
+  been **failing since Phase 7** (it enrolls 1 000 hosts; the default plan
+  allows 100) and was fixed here; the machine is the same.
+- Docker (CI): all five demo monitors up 10.6 s after `docker run`.
+
+**Mutation checks** — every new guard was broken on purpose and a test
+failed: dial control (HTTP, TCP), the ping policy check, the redirect cap,
+the body cap, the chain walk, case folding, the check timeout, the blocked
+class; confirmation count, reclassification, the cover gap, incident
+duration, the expiry boundary, unknown results, clamping, the window edge;
+revision check, closing only the open incident, the quota, ending
+incidents on pause, pruning open incidents, result ordering, the retarget
+reset; overdue scheduling, concurrency, retry delay, tenant share, skip
+counting, removal, phase, revision ordering, silences, references; the
+erasure needles and the shared-target exemption; the UI's gap level,
+truncation, viewer controls, http-only fields, ping availability, admin
+actions and accessible bar labels. One survivor, equivalent to the
+original: adding an alert-silence test to the monitor silence check
+changes no outcome.
+
+**Caught before shipping**
+- The statement audit did not know the new tables and passed without
+  looking at them; a new test fails when any table with `tenant_key` is
+  missing from the audit's list.
+- A reload racing a check could reschedule from stale state; listings
+  older than the scheduler's state are now ignored.
+- With references enabled but none configured, every network failure would
+  have been recorded as unknown.
+- Looking at the rendered pages: a monitor that had just gone down showed
+  100 % until the next check, and a sub-millisecond response showed as
+  missing.
+- The browser test found that deleting a monitor left the page on a 404.
+- The demo's flapping service would never have flapped (`time.Since` of the
+  zero time saturates).
+- Windows CI: a loopback connect can measure 0 s; tests demanded > 0.
+
+**Still open**
+- Status pages, checks from agents or several locations, custom headers and
+  authentication, DNS and heartbeat monitors (PLAN Phase 9 non-goals).
+
+---
+
 ## Phase 8 — Showcase polish · 2026-10-24
 
 **Landed**

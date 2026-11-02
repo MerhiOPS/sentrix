@@ -1,6 +1,6 @@
 # Sentrix — Build Plan
 
-**Status:** v2 reviewed · 2026-10-24; Phase 9 (uptime) proposed 2026-11-01 · Owner: Ahmad Merhi
+**Status:** v2 reviewed · 2026-10-24; Phase 9 (uptime) proposed 2026-11-01, done 2026-11-02 (see docs/LOG.md) · Owner: Ahmad Merhi
 
 Sentrix is a clean rebuild of an earlier in-house prototype (called OLD
 below) as a **showcase**: one

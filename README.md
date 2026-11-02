@@ -2,9 +2,10 @@
 
 [![CI](https://github.com/MerhiOPS/sentrix/actions/workflows/ci.yml/badge.svg)](https://github.com/MerhiOPS/sentrix/actions/workflows/ci.yml)
 
-Lightweight server monitoring: a Go agent for Linux and Windows, a single
-binary server with an embedded React dashboard, and SQLite storage behind
-ports that a ClickHouse adapter could implement.
+Lightweight server and uptime monitoring: a Go agent for Linux and Windows,
+a single binary server with an embedded React dashboard that also checks
+websites and services from the outside, and SQLite storage behind ports that
+a ClickHouse adapter could implement.
 
 ![Fleet view](docs/screenshots/fleet.png)
 
@@ -16,6 +17,13 @@ ports that a ClickHouse adapter could implement.
   server before storage**. Substring search, live tail.
 - **Alerts**: thresholds and "host went silent", per-rule no-data policy,
   silences, Slack and webhooks behind an SSRF guard.
+- **Uptime**: HTTP(S) checks with accepted status codes and a keyword,
+  certificate validity and expiry (the earliest date in the whole chain),
+  TCP ports and ping, run from the server. A failed check is re-checked
+  before an incident opens; uptime counts monitored time only (paused time
+  and server outages are neither up nor down); 90 days of daily history;
+  down, up and certificate notifications through the same channels. Every
+  connection, redirect hops included, goes through the SSRF guard.
 - **Operations**: per-tenant plans and metering, retention, export, GDPR
   erasure with an on-disk post-check, backup and a verified restore.
 
@@ -50,6 +58,8 @@ go build ./cmd/sentrix-server ./cmd/sentrix-agent
 | host detail: CPU, load, per core | logs — the email, address and token were redacted before storage |
 | ![Alerts](docs/screenshots/alerts-admin.png) | ![Settings](docs/screenshots/settings.png) |
 | alerts: a fire and resolve cycle | plan limits and metered usage |
+| ![Uptime](docs/screenshots/uptime.png) | ![A monitor](docs/screenshots/monitor.png) |
+| uptime: status, uptime, response time, 30 days | a monitor: windows, 90 days, response time, incidents |
 
 ## Install
 
@@ -68,6 +78,15 @@ sudo dpkg -i sentrix-agent_*.deb
 sudo -u sentrix-agent sentrix-agent enroll --state-dir /var/lib/sentrix-agent --server https://SERVER:8443 --token TOKEN
 sudo systemctl enable --now sentrix-agent
 ```
+
+Uptime checks run from the server and refuse private, loopback and cloud
+metadata addresses. On a single-company install, add `--uptime-allow-private`
+to `SENTRIX_SERVER_ARGS` to monitor your own network (metadata stays
+blocked), and `--uptime-reference https://…` with a site that should always
+answer, so that if the server itself loses its network the checks are
+recorded as unknown instead of paging everyone. Ping uses unprivileged ICMP
+sockets: `net.ipv4.ping_group_range` must include the `sentrix` group
+(systemd's default does).
 
 Windows: `sentrix-agent.exe enroll …` then `sentrix-agent.exe install` (a
 service under its own virtual account; the credential is DPAPI-encrypted).
@@ -109,12 +128,15 @@ is in [`docs/LOG.md`](docs/LOG.md).
 | | |
 |---|---|
 | agent footprint | 13.3 MB RSS, 0.13 % of one core at a 5 s interval |
-| ingest ceiling, full server path | 840–940 batches/s ≈ **8 400–9 400 hosts** at 5 s with per-core/disk/NIC detail (`BenchmarkIngestCeiling`) |
+| ingest ceiling, full server path | 1 170–1 185 batches/s ≈ **11 700–11 800 hosts** at 5 s with per-core/disk/NIC detail (`BenchmarkIngestCeiling`) |
+| same, while 1 000 monitors are checked every minute | 1 200–1 205 batches/s: no measurable cost (`BenchmarkIngestCeilingWithUptime`) |
+| uptime results stored | 9 400 checks/s from 8 writers (the database is never the limit; probes are); **32 B** on disk per check, rollups included (`BenchmarkUptimeChecks`) |
 | core sample on disk | 67.6 B |
 | logs, 1 M lines | 278 B/line with the search index; 58–125 ms per text search |
 | server killed (`kill -9`) for 2 min under an agent | 0 samples lost, 0 stored twice (`scripts/outage.sh`) |
 | backup / verified restore, 73 MiB database | 0.22 s / 1.02 s, every table identical |
 | alert latency | ~1.5 min after the condition starts holding (1-minute rollups) |
+| demo: `docker run` to every uptime monitor up | 10.6 s (`scripts/smoke-docker.sh`, CI) |
 | from-source build | ~13 s (web 3.3 s, Go 9.6 s with a cold build cache) |
 
 Tests that matter most are mutation-checked: every guard (tenant isolation,

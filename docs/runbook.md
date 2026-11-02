@@ -143,3 +143,36 @@ acknowledged, so they cannot resend it. Only batches still unacknowledged
 (for example while the server was down for the restore) are replayed. Hosts
 enrolled after the copy are unknown to the restored database and must be
 re-enrolled (see above: 401).
+
+## Uptime checks
+
+**A monitor is down with `blocked`.** The target resolves to an address the
+server refuses: loopback, private (RFC 1918, ULA, CGNAT), link-local or a
+cloud metadata address. Nothing was sent to it. On a single-company install
+that should monitor its own network, add `--uptime-allow-private`;
+metadata addresses stay blocked whatever the flag.
+
+**Every monitor went down at once.** Most likely the server's own network,
+not every site. With `--uptime-reference` set, such failures are stored as
+`unknown` and nothing transitions; `references_configured` in
+`GET /api/v1/system` shows whether it is. Without it, the incidents are
+real records of what the server saw, and close by themselves once the
+network returns.
+
+**Checks are late or skipped.** `GET /api/v1/system` → `server.uptime`:
+`max_lateness_ms` should stay below a few seconds and `skipped` at 0. A
+skipped check waited a whole interval for a worker: raise
+`--uptime-workers` (default 64; each tenant gets at most a quarter), or
+look for many monitors with long timeouts against unresponsive targets.
+
+**Ping monitors are refused.** The server could not open an unprivileged
+ICMP socket (`ping_available: false`). Allow its group:
+`sysctl -w net.ipv4.ping_group_range="0 2147483647"` (persist it in
+`/etc/sysctl.d/`). No capability is needed. Containers: Docker sets this
+by default.
+
+**A notification did not arrive.** The monitor page lists every event with
+its delivery outcome; `(not sent: no channel or silenced)` means the
+monitor has no channel or a silence covers it, `failed: …` carries the
+channel's error after three attempts. Events queued when the server stopped
+are marked failed at the next start.
