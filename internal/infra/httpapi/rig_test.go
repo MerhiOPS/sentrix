@@ -61,7 +61,7 @@ func newRig(t *testing.T) *rig {
 	ctx := context.Background()
 	st := memstore.New()
 	hasher := password.New(4)
-	sessions, err := identity.NewSessions(ctx, st, st, hasher, identity.NewLoginLimiter(5, time.Minute, 1000, time.Now), time.Now)
+	sessions, err := identity.NewSessions(ctx, st, st, hasher, identity.NewLoginGuard(5, 20, time.Minute, 1000, time.Now), time.Now)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -25,7 +25,7 @@ type Sessions struct {
 	users    UserRepo
 	sessions SessionRepo
 	hasher   PasswordHasher
-	limiter  *LoginLimiter
+	guard    *LoginGuard
 	now      func() time.Time
 	dummy    string // a real hash, verified against for unknown emails
 }
@@ -34,12 +34,12 @@ type Sessions struct {
 // so that a login for an unknown email costs one full verification, like a
 // real one: response time must not reveal which emails exist.
 func NewSessions(ctx context.Context, users UserRepo, sessions SessionRepo, hasher PasswordHasher,
-	limiter *LoginLimiter, now func() time.Time) (*Sessions, error) {
+	guard *LoginGuard, now func() time.Time) (*Sessions, error) {
 	dummy, err := hasher.Hash(ctx, "dummy-password-never-matches")
 	if err != nil {
 		return nil, fmt.Errorf("prepare dummy hash: %w", err)
 	}
-	return &Sessions{users: users, sessions: sessions, hasher: hasher, limiter: limiter, now: now, dummy: dummy}, nil
+	return &Sessions{users: users, sessions: sessions, hasher: hasher, guard: guard, now: now, dummy: dummy}, nil
 }
 
 // Login verifies credentials and returns a new session token. A new token
@@ -49,27 +49,29 @@ func (s *Sessions) Login(ctx context.Context, email, password, client string) ([
 	if err != nil {
 		return nil, domain.Session{}, errBadLogin
 	}
-	key := e + "|" + client
-	if !s.limiter.Allowed(key) {
-		return nil, domain.Session{}, ErrLoginThrottled
-	}
 	u, hash, err := s.users.FindLogin(ctx, e)
 	if err != nil && !errors.Is(err, domain.ErrNotFound) {
 		return nil, domain.Session{}, fmt.Errorf("find login: %w", err)
 	}
 	known := err == nil
-	if !known {
+	who := subject{email: e}
+	if known {
+		who.user = &u.ID
+	} else {
 		hash = s.dummy
+	}
+	if !s.guard.allowed(who, client) {
+		return nil, domain.Session{}, ErrLoginThrottled
 	}
 	ok, verr := s.hasher.Verify(ctx, password, hash)
 	if verr != nil {
 		return nil, domain.Session{}, fmt.Errorf("verify password: %w", verr)
 	}
 	if !known || !ok || u.DisabledAt != nil {
-		s.limiter.Fail(key)
+		s.guard.fail(who, client)
 		return nil, domain.Session{}, errBadLogin
 	}
-	s.limiter.Succeed(key)
+	s.guard.succeed(who, client)
 	return s.start(ctx, u)
 }
 

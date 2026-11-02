@@ -29,8 +29,9 @@ import (
 const (
 	authTTL         = 30 * time.Second // a disabled host keeps sending at most this long
 	authCache       = 10_000
-	hashParallel    = 2 // concurrent Argon2id operations: 2 × 46 MiB
-	loginFailures   = 5
+	hashParallel    = 2  // concurrent Argon2id operations: 2 × 46 MiB
+	loginFailures   = 5  // per account and client
+	loginAccountMax = 20 // per account across every client
 	loginWindow     = 15 * time.Minute
 	loginTrackKeys  = 50_000
 	shutdownTimeout = 15 * time.Second
@@ -57,8 +58,8 @@ func build(ctx context.Context, st *sqlite.Store, dataDir string, pin []byte, ex
 	auth := ingest.NewAuthenticator(st, authTTL, authCache, time.Now)
 	ingestH := ingesthttp.NewHandler(auth, svc, enroll)
 
-	limiter := identity.NewLoginLimiter(loginFailures, loginWindow, loginTrackKeys, time.Now)
-	sessions, err := identity.NewSessions(ctx, st, st, password.New(hashParallel), limiter, time.Now)
+	guard := identity.NewLoginGuard(loginFailures, loginAccountMax, loginWindow, loginTrackKeys, time.Now)
+	sessions, err := identity.NewSessions(ctx, st, st, password.New(hashParallel), guard, time.Now)
 	if err != nil {
 		return handlers{}, err
 	}

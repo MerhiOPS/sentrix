@@ -5,13 +5,14 @@ import (
 	"time"
 )
 
-// LoginLimiter throttles failed logins per key (account + client address).
-// Its state is bounded: an unbounded map, or an O(n²) prune of it, would
-// itself be a DoS. When it is full even after pruning, it fails *closed*:
-// keys it cannot track are refused until entries expire. Failing open would
-// let an attacker fill the table with junk keys and then brute-force a real
-// account unthrottled; failing closed only delays legitimate logins during
-// an attack, for at most one window.
+// LoginLimiter throttles failed logins per key. Its state is bounded: an
+// unbounded map, or an O(n²) prune of it, would itself be a DoS. When it is
+// full even after pruning it fails *closed* by default: keys it cannot track
+// are refused until entries expire, since failing open would let an attacker
+// fill the table and then guess unthrottled. A table whose keys an attacker
+// chooses can instead be filled to lock everyone out, so LoginGuard makes
+// those tables fail open and relies on its per-account table, which only
+// holds real accounts, to bound guessing.
 type LoginLimiter struct {
 	mu        sync.Mutex
 	failures  map[string]*failure
@@ -20,6 +21,7 @@ type LoginLimiter struct {
 	max       int           // tracked keys
 	now       func() time.Time
 	lastSwept time.Time
+	failOpen  bool // when full, admit untracked keys (see LoginGuard)
 }
 
 type failure struct {
@@ -32,13 +34,20 @@ func NewLoginLimiter(limit int, window time.Duration, max int, now func() time.T
 	return &LoginLimiter{failures: map[string]*failure{}, limit: limit, window: window, max: max, now: now}
 }
 
+// FailOpen makes a full limiter admit keys it cannot track instead of
+// refusing them. Only safe where another limiter bounds what that admits.
+func (l *LoginLimiter) FailOpen() *LoginLimiter {
+	l.failOpen = true
+	return l
+}
+
 // Allowed reports whether key may attempt a login now.
 func (l *LoginLimiter) Allowed(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	f, ok := l.failures[key]
 	if !ok {
-		return len(l.failures) < l.max || l.sweepAndHasRoom(l.now())
+		return len(l.failures) < l.max || l.sweepAndHasRoom(l.now()) || l.failOpen
 	}
 	if l.now().Sub(f.first) >= l.window {
 		delete(l.failures, key)
